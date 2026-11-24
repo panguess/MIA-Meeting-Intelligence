@@ -303,7 +303,8 @@
           mimeType: blob.type,
           blob,
           size: blob.size,
-          incomplete: true
+          incomplete: true,
+          live: liveTake(session.id)
         });
         if (!latest || session.startedAt > latest.startedAt) latest = session;
       }
@@ -557,7 +558,7 @@
       state.recordingId = crypto.randomUUID();
       state.marks = [];
       updateMarkLabel();
-      liveStart();
+      liveStart(state.recordingId);
 
       const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
         || t("meetingWord") + " " + formatDate(state.startedAt);
@@ -706,7 +707,16 @@
   // restarted for as long as the recording runs. The audio is still recorded
   // as a backup ("Improve accuracy" re-listens to it).
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const live = { rec: null, on: false, lines: [], interim: "", failed: "" };
+  const live = { rec: null, on: false, lines: [], interim: "", failed: "", lastEvent: 0, dog: null, id: null };
+  // Live lines are also kept in localStorage while recording, so a crash or an
+  // iOS reload keeps the text of the recovered part.
+  const liveKey = id => "mia-live-" + id;
+  const fmtStamp = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const liveAsText = lines => lines.map(l => "[" + fmtStamp(l.at) + "] " + l.text).join("\n");
+  function liveSave() { if (live.id) { try { localStorage.setItem(liveKey(live.id), JSON.stringify(live.lines)); } catch {} } }
+  function liveTake(id) {
+    try { const raw = localStorage.getItem(liveKey(id)); localStorage.removeItem(liveKey(id)); return raw ? liveAsText(JSON.parse(raw)) : ""; } catch { return ""; }
+  }
   function liveRender() {
     const box = el("liveBox");
     if (!box) return;
@@ -714,8 +724,8 @@
     const last = live.lines.slice(-3).map(l => l.text).join(" ");
     el("liveText").textContent = (last + (live.interim ? " " + live.interim : "")).trim() || (live.failed || "Listening…");
   }
-  function liveStart() {
-    live.lines = []; live.interim = ""; live.failed = "";
+  function liveStart(id) {
+    live.lines = []; live.interim = ""; live.failed = ""; live.id = id || null;
     if (!Speech) return;
     live.on = true;
     const run = () => {
@@ -727,10 +737,11 @@
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i], text = (res[0] && res[0].transcript || "").trim();
           if (!text) continue;
-          if (res.isFinal) live.lines.push({ at: Math.round(elapsedSeconds()), text });
+          if (res.isFinal) { live.lines.push({ at: Math.round(elapsedSeconds()), text }); liveSave(); }
           else interim += " " + text;
         }
         live.interim = interim.trim();
+        live.lastEvent = Date.now();
         liveRender();
       };
       r.onerror = e => {
@@ -741,23 +752,37 @@
       };
       r.onend = () => { if (live.on) setTimeout(() => { if (live.on && !state.pausedAt) run(); }, 250); };
       live.rec = r;
-      try { r.start(); } catch { live.on = false; }
+      live.lastEvent = Date.now();
+      try { r.start(); } catch { setTimeout(() => { if (live.on && !state.pausedAt) run(); }, 1000); }
     };
+    live.run = run;
     run();
+    // Watchdog: if iOS silently stops recognising (no result, no end event)
+    // for 45 s while recording, start a fresh session.
+    clearInterval(live.dog);
+    live.dog = setInterval(() => {
+      if (!live.on || state.pausedAt) return;
+      if (Date.now() - live.lastEvent > 45000) {
+        try { live.rec && (live.rec.onend = null, live.rec.abort ? live.rec.abort() : live.rec.stop()); } catch {}
+        run();
+      }
+    }, 15000);
     liveRender();
   }
   function livePause(paused) {
     if (!live.on && !live.rec) return;
     if (paused) { try { live.rec && live.rec.stop(); } catch {} }
-    else if (live.on) { try { live.rec && live.rec.start(); } catch {} }
+    else if (live.on && live.run) { live.lastEvent = Date.now(); live.run(); }
   }
   function liveStop() {
     live.on = false;
+    clearInterval(live.dog);
     if (live.interim) { live.lines.push({ at: Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
     try { live.rec && live.rec.stop(); } catch {}
     live.rec = null;
-    const fmt = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-    const text = live.lines.map(l => "[" + fmt(l.at) + "] " + l.text).join("\n");
+    const text = liveAsText(live.lines);
+    if (live.id) { try { localStorage.removeItem(liveKey(live.id)); } catch {} }
+    live.id = null;
     liveRender();
     return text;
   }
