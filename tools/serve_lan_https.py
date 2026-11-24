@@ -77,6 +77,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     do_PUT = do_DELETE = do_PATCH = do_POST
 
 
+def local_hostname():
+    """The computer's Bonjour/mDNS name, e.g. laptop-30s5lpqp.local.
+
+    Using this name instead of the IP keeps the iPhone's MIA address the same
+    when the computer gets a new IP, so recordings stay visible in the app.
+    """
+    name = socket.gethostname().split(".", 1)[0].strip().lower()
+    return f"{name}.local" if name else None
+
+
 def lan_addresses():
     addresses = set()
     try:
@@ -109,8 +119,12 @@ def main():
     server.socket = context.wrap_socket(server.socket, server_side=True)
 
     print("MIA LAN test server (test only, not for production).")
+    hostname = local_hostname()
+    if hostname:
+        print(f"  Open on iPhone Safari (recommended, stable): https://{hostname}:{args.port}/")
+        print(f"  Create the certificate for this name: mkcert ... {hostname} localhost")
     for address in lan_addresses() or ["<this computer's LAN IP>"]:
-        print(f"  Open on iPhone Safari: https://{address}:{args.port}/")
+        print(f"  Fallback by IP (changes with the network): https://{address}:{args.port}/")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()

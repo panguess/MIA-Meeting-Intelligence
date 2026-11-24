@@ -25,7 +25,7 @@
       chooseFile: "เลือกไฟล์เสียง",
       library: "ไฟล์เสียงในอุปกรณ์",
       empty: "ยังไม่มีไฟล์เสียง",
-      privacy: "MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เป้าหมายเก็บเสียง 90 วัน · ไม่มี Cloud AI หรือการส่งข้อมูลออก",
+      privacy: "MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เตือนเมื่อไฟล์เก่าเกิน 90 วันแต่ไม่ลบเอง · ไม่มี Cloud AI หรือการส่งข้อมูลออก",
       micDenied: "ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน โปรดอนุญาตใน Settings ของ Safari",
       micUnsupported: "เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียงที่จำเป็น กรุณาใช้ Safari รุ่นปัจจุบัน",
       recordingStarted: "กำลังบันทึกเสียงบนอุปกรณ์นี้",
@@ -38,6 +38,18 @@
       trackEnded: "ไมโครโฟนหยุดทำงาน ระบบจึงหยุดบันทึกเพื่อป้องกันไฟล์ที่ไม่มีเสียง",
       routeHint: "หากเปลี่ยนอุปกรณ์เสียง อาจมีช่วงเสียงขาดหาย",
       deleteConfirm: "ลบไฟล์เสียงนี้ออกจากอุปกรณ์หรือไม่?",
+      deleteConfirmUnexported: "ไฟล์นี้ยังไม่เคยส่งออก ถ้าลบแล้วจะกู้คืนไม่ได้ ต้องการลบหรือไม่?",
+      notExported: "ยังไม่ได้ส่งออก",
+      exportedOn: "ส่งออกแล้ว",
+      exportedMark: "บันทึกว่าส่งออกแล้ว",
+      reminderUnexported: "มี {n} ไฟล์ที่ยังไม่ได้ส่งออก พื้นที่ในเบราว์เซอร์อาจถูก iOS ล้างได้ ควรกด ส่งออก → บันทึกไปยังไฟล์ หลังจบประชุมทุกครั้ง",
+      reminderOld: "มี {n} ไฟล์เก่าเกิน 90 วัน MIA จะไม่ลบเอง เมื่อส่งออกเก็บไว้แล้วให้กด ลบ ด้วยตัวเอง",
+      resume: "อัดต่อ",
+      resumePart: "ส่วนที่",
+      stoppedUnexpectedly: "การบันทึกหยุดกลางคัน",
+      resumeHint: "เสียงก่อนหน้าเก็บไว้แล้ว แตะ อัดต่อ เพื่อบันทึกส่วนถัดไปทันที",
+      recoveredHint: "พบการบันทึกที่ค้างจากครั้งก่อนและกู้คืนไว้แล้ว ถ้าประชุมยังไม่จบ แตะ อัดต่อ",
+      wakeLockUnavailable: "อุปกรณ์นี้กันจอดับให้อัตโนมัติไม่ได้ ระหว่างประชุมให้ตั้ง ล็อกอัตโนมัติ เป็น ไม่ใช้ และปิดโหมดประหยัดพลังงาน",
       deleted: "ลบไฟล์แล้ว",
       play: "เล่น",
       export: "ส่งออก",
@@ -51,7 +63,7 @@
       noExport: "ส่งออกไฟล์ไม่สำเร็จ",
       permissionTip: "อนุญาตใช้ไมโครโฟนเมื่อ Safari ถาม",
       backgroundWarning: "ข้อจำกัด iOS: Safari อาจหยุดบันทึกเมื่อสลับแอป ล็อกหน้าจอ หรือมีสายเข้า ให้เปิด MIA ค้างไว้และอย่าล็อกหน้าจอ การบันทึกต่อเนื่องไม่รับประกัน ทดสอบกับ iPhone จริงก่อนใช้กับการประชุมสำคัญ",
-      foregroundNote: "สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้ใน Safari และอย่าล็อกหน้าจอ iOS อาจหยุดหรือพักการบันทึกเมื่อสลับแอปหรือมีสายเข้า จึงไม่รับประกันว่าจะบันทึกครบทั้งการประชุม",
+      foregroundNote: "สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้และอย่ากดล็อกหน้าจอ MIA จะพยายามกันจอดับให้ แต่ควรปิดโหมดประหยัดพลังงานและเปิดโหมดห้ามรบกวน ถ้ามีสายเข้าหรือสลับแอป iOS อาจหยุดการบันทึก ให้แตะ อัดต่อ เมื่อกลับมา",
       installHint: "เพิ่ม MIA ไปยังหน้าจอโฮม: เปิดด้วย Safari → แตะ Share → Add to Home Screen (ต้องใช้ลิงก์ HTTPS)",
       dbError: "เปิดพื้นที่จัดเก็บในอุปกรณ์ไม่ได้"
     },
@@ -70,7 +82,7 @@
       chooseFile: "Choose audio file",
       library: "On-device audio files",
       empty: "No audio files yet",
-      privacy: "MIA prototype · files stay on this iPhone · 90-day audio retention target · no Cloud AI or outbound audio transfer",
+      privacy: "MIA prototype · files stay on this iPhone · reminds you after 90 days but never deletes on its own · no Cloud AI or outbound audio transfer",
       micDenied: "Microphone permission was denied. Allow microphone access in Safari Settings.",
       micUnsupported: "This browser does not support the required audio recording APIs. Please use current Safari.",
       recordingStarted: "Recording on this device",
@@ -83,6 +95,18 @@
       trackEnded: "The microphone track ended. MIA stopped recording to avoid saving a silent file.",
       routeHint: "An audio route change may cause a recording gap.",
       deleteConfirm: "Delete this audio file from this device?",
+      deleteConfirmUnexported: "This file has never been exported. Once deleted it cannot be recovered. Delete it?",
+      notExported: "Not exported",
+      exportedOn: "Exported",
+      exportedMark: "Marked as exported",
+      reminderUnexported: "{n} file(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
+      reminderOld: "{n} file(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they are exported.",
+      resume: "Resume",
+      resumePart: "part",
+      stoppedUnexpectedly: "Recording stopped unexpectedly",
+      resumeHint: "The audio so far is saved. Tap Resume to record the next part right away.",
+      recoveredHint: "An unfinished recording from last time was recovered. If the meeting is still going, tap Resume.",
+      wakeLockUnavailable: "This device cannot keep the screen on automatically. During meetings set Auto-Lock to Never and turn off Low Power Mode.",
       deleted: "Audio deleted",
       play: "Play",
       export: "Export",
@@ -96,7 +120,7 @@
       noExport: "Could not export audio",
       permissionTip: "Allow microphone access when Safari asks",
       backgroundWarning: "iOS limitation: Safari may stop or suspend recording when you switch apps, lock the screen, or receive a call. Keep MIA open and the screen unlocked. Continuous recording is not guaranteed; test on the actual iPhone before an important meeting.",
-      foregroundNote: "Important: keep MIA open in Safari and leave the screen unlocked while recording. iOS may stop or suspend recording when you switch apps or receive a call, so a complete meeting recording is not guaranteed.",
+      foregroundNote: "Important: keep MIA open and do not press the lock button while recording. MIA tries to keep the screen on, but turn off Low Power Mode and turn on Do Not Disturb. A call or app switch can still stop iOS recording; tap Resume when you return.",
       installHint: "Add MIA to Home Screen: open the HTTPS link in Safari → Share → Add to Home Screen.",
       dbError: "Could not open local on-device storage"
     }
@@ -116,11 +140,16 @@
     elapsedTimer: null,
     currentObjectUrls: new Map(),
     recordingId: null,
-    pendingWarning: false
+    pendingWarning: false,
+    userStopped: false,
+    wakeLock: null,
+    resume: null
   };
 
-  function t(key) {
-    return translations[state.language][key] || key;
+  function t(key, params) {
+    let text = translations[state.language][key] || key;
+    if (params) for (const [name, value] of Object.entries(params)) text = text.replace("{" + name + "}", String(value));
+    return text;
   }
 
   function showWarning(message) {
@@ -141,6 +170,19 @@
     el("startButton").disabled = recording;
     el("stopButton").disabled = !recording;
     el("importButton").disabled = recording;
+    if (recording) hideResume();
+  }
+
+  function offerResume(resume, hintKey) {
+    state.resume = resume;
+    el("resumeButton").textContent = t("resume") + " (" + t("resumePart") + " " + resume.part + ")";
+    el("resumeButton").classList.remove("hidden");
+    showWarning(t(hintKey));
+  }
+
+  function hideResume() {
+    state.resume = null;
+    el("resumeButton").classList.add("hidden");
   }
 
   function updateTranslations() {
@@ -151,7 +193,8 @@
     });
     el("languageButton").textContent = state.language === "th" ? "EN" : "TH";
     el("meetingTitle").placeholder = state.language === "th" ? "เช่น Weekly Risk Review" : "e.g. Weekly Risk Review";
-    if (!state.recorder) setStatus(t("ready"), false);
+    if (!state.recorder && !state.resume) setStatus(t("ready"), false);
+    if (state.resume) el("resumeButton").textContent = t("resume") + " (" + t("resumePart") + " " + state.resume.part + ")";
     renderRecordings();
   }
 
@@ -222,6 +265,7 @@
 
   async function recoverInterruptedSessions() {
     const sessions = (await dbRequest("readonly", store => store.getAll(), SESSION_STORE)) || [];
+    let latest = null;
     for (const session of sessions) {
       const rows = await getChunks(session.id);
       const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -241,9 +285,22 @@
           size: blob.size,
           incomplete: true
         });
+        if (!latest || session.startedAt > latest.startedAt) latest = session;
       }
       await deleteSessionData(session.id);
     }
+    // Only offer to continue if the interrupted recording started recently.
+    if (latest && Date.now() - latest.startedAt < 6 * 60 * 60 * 1000) {
+      offerResume(nextPart(latest), "recoveredHint");
+      setStatus(t("stoppedUnexpectedly"), false);
+    }
+  }
+
+  function nextPart(session) {
+    return {
+      baseTitle: session.baseTitle ?? session.title ?? "",
+      part: (session.part || 1) + 1
+    };
   }
 
   function formatDuration(seconds) {
@@ -282,6 +339,7 @@
     }
     records.sort((a, b) => b.createdAt - a.createdAt);
     el("recordCount").textContent = String(records.length);
+    renderReminders(records);
     container.replaceChildren();
 
     if (!records.length) {
@@ -308,8 +366,10 @@
         formatDate(record.createdAt),
         formatDuration(record.durationSeconds),
         record.incomplete ? t("incomplete") : "",
-        humanBytes(record.blob?.size || 0)
-      ].join(" · ");
+        humanBytes(record.blob?.size || 0),
+        record.exportedAt ? t("exportedOn") + " " + formatDate(record.exportedAt) : t("notExported")
+      ].filter(Boolean).join(" · ");
+      if (!record.exportedAt) item.classList.add("unexported");
 
       const actions = document.createElement("div");
       actions.className = "record-actions";
@@ -343,14 +403,19 @@
     return (value / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1) + " " + units[index];
   }
 
-  async function cleanupExpired() {
-    const records = await getAllRecordings();
+  // MIA never deletes recordings on its own. Recordings older than the
+  // retention target, and recordings never exported, are only flagged so the
+  // user can export them and delete them deliberately.
+  function renderReminders(records) {
     const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const expired = records.filter(record => record.createdAt < cutoff);
-    for (const record of expired) {
-      await dbRequest("readwrite", store => store.delete(record.id));
-      revokeObjectUrl(record.id);
-    }
+    const unexported = records.filter(record => !record.exportedAt).length;
+    const old = records.filter(record => record.createdAt < cutoff).length;
+    const lines = [];
+    if (unexported) lines.push(t("reminderUnexported", { n: unexported }));
+    if (old) lines.push(t("reminderOld", { n: old }));
+    const box = el("reminder");
+    box.textContent = lines.join(" ");
+    box.classList.toggle("show", lines.length > 0);
   }
 
   function bestMimeType() {
@@ -365,8 +430,32 @@
     return candidates.find(type => MediaRecorder.isTypeSupported(type)) || "";
   }
 
-  async function startRecording() {
+  async function acquireWakeLock() {
+    if (!("wakeLock" in navigator)) {
+      showWarning(t("wakeLockUnavailable"));
+      return;
+    }
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      state.wakeLock = lock;
+      lock.addEventListener("release", () => {
+        if (state.wakeLock === lock) state.wakeLock = null;
+      });
+    } catch {
+      showWarning(t("wakeLockUnavailable"));
+    }
+  }
+
+  function releaseWakeLock() {
+    const lock = state.wakeLock;
+    state.wakeLock = null;
+    if (lock) lock.release().catch(() => {});
+  }
+
+  async function startRecording(resume = null) {
     clearWarning();
+    const continuing = resume && typeof resume.part === "number" ? resume : null;
+    hideResume();
 
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       showWarning(t("micUnsupported"));
@@ -410,16 +499,23 @@
       state.startedAt = Date.now();
       state.recordingId = crypto.randomUUID();
 
-      const title = (el("meetingTitle").value || "").trim();
+      const baseTitle = continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim();
+      const part = continuing ? continuing.part : 1;
+      const title = part > 1
+        ? (baseTitle || (state.language === "th" ? "การประชุม" : "Meeting")) + " · " + t("resumePart") + " " + part
+        : baseTitle;
       const extension = fileExtension(mimeType);
       const fileName = "MIA-" + new Date(state.startedAt).toISOString().replace(/[:.]/g, "-") + "." + extension;
       await dbRequest("readwrite", store => store.put({
         id: state.recordingId,
         title,
+        baseTitle,
+        part,
         fileName,
         startedAt: state.startedAt,
         mimeType
       }), SESSION_STORE);
+      state.userStopped = false;
 
       const recorder = new MediaRecorder(stream, { mimeType });
       state.recorder = recorder;
@@ -445,6 +541,7 @@
         const recordingId = state.recordingId;
         const startedAt = state.startedAt || endedAt;
         const wasPossiblyInterrupted = state.pendingWarning;
+        const stoppedByUser = state.userStopped;
         await state.chunkWriteQueue;
         const rows = recordingId ? await getChunks(recordingId) : [];
         const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -454,6 +551,7 @@
           ? await dbRequest("readonly", store => store.get(recordingId), SESSION_STORE)
           : null;
         stopTracks();
+        releaseWakeLock();
 
         state.recorder = null;
         state.chunks = [];
@@ -466,6 +564,7 @@
           if (recordingId) await deleteSessionData(recordingId);
           setStatus(t("ready"), false);
           showWarning(t("noAudio"));
+          if (!stoppedByUser && sessionRows) offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1 }, "resumeHint");
           return;
         }
 
@@ -487,9 +586,14 @@
         try {
           await saveRecording(record);
           await deleteSessionData(recordingId);
-          setStatus(t("saved"), false);
-          if (!wasPossiblyInterrupted) clearWarning();
-          else showWarning(t("interruption"));
+          if (!stoppedByUser) {
+            setStatus(t("stoppedUnexpectedly"), false);
+            offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
+          } else {
+            setStatus(t("saved"), false);
+            if (!wasPossiblyInterrupted) clearWarning();
+            else showWarning(t("interruption"));
+          }
         } catch (error) {
           setStatus(t("ready"), false);
           showWarning(t("storageFailed") + " " + (error?.message || ""));
@@ -499,8 +603,10 @@
       recorder.start(1000);
       setStatus(t("recordingStarted"), true);
       startTimer();
+      await acquireWakeLock();
     } catch (error) {
       stopTracks();
+      releaseWakeLock();
       state.recorder = null;
       state.stream = null;
       if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
@@ -513,6 +619,7 @@
 
   function stopRecording() {
     if (state.recorder && state.recorder.state !== "inactive") {
+      state.userStopped = true;
       state.recorder.stop();
     }
   }
@@ -613,6 +720,7 @@
         const shareFile = new File([record.blob], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
         if (navigator.canShare?.({ files: [shareFile] })) {
           await navigator.share({ files: [shareFile], title: record.title || "MIA audio" });
+          await markExported(id);
           return;
         }
       }
@@ -625,16 +733,28 @@
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (navigator.canShare && typeof File === "function") {
-        // Share is intentionally not invoked automatically; user can use the downloaded file via iOS Share Sheet.
-      }
+      await markExported(id);
     } catch (error) {
       if (error?.name !== "AbortError") showWarning(t("noExport") + ": " + (error?.message || ""));
     }
   }
 
+  async function markExported(id) {
+    const record = await getRecord(id);
+    if (!record) return;
+    record.exportedAt = Date.now();
+    await saveRecording(record);
+    if (!state.recorder) setStatus(t("exportedMark"), false);
+  }
+
   async function deleteRecord(id) {
-    if (!window.confirm(t("deleteConfirm"))) return;
+    let record = null;
+    try {
+      record = await getRecord(id);
+    } catch {
+      // Fall back to the stronger warning below.
+    }
+    if (!window.confirm(t(record?.exportedAt ? "deleteConfirm" : "deleteConfirmUnexported"))) return;
     try {
       await dbRequest("readwrite", store => store.delete(id));
       revokeObjectUrl(id);
@@ -649,9 +769,11 @@
     if (document.visibilityState === "hidden" && state.recorder && state.recorder.state === "recording") {
       state.pendingWarning = true;
       showWarning(t("interruption"));
-    } else if (document.visibilityState === "visible" && state.pendingWarning) {
+    } else if (document.visibilityState === "visible") {
+      // iOS releases the wake lock whenever the page is hidden.
+      if (state.recorder && state.recorder.state === "recording" && !state.wakeLock) acquireWakeLock();
       // Keep the flag until finalization so the saved recording is marked for review.
-      showWarning(t("interruption"));
+      if (state.pendingWarning) showWarning(t("interruption"));
     }
   }
 
@@ -668,7 +790,8 @@
       state.language = state.language === "th" ? "en" : "th";
       updateTranslations();
     });
-    el("startButton").addEventListener("click", startRecording);
+    el("startButton").addEventListener("click", () => startRecording());
+    el("resumeButton").addEventListener("click", () => startRecording(state.resume));
     el("stopButton").addEventListener("click", stopRecording);
     el("importButton").addEventListener("click", () => el("fileInput").click());
     el("fileInput").addEventListener("change", async event => {
@@ -689,7 +812,6 @@
     el("warning").textContent = "";
     try {
       state.db = await openDatabase();
-      await cleanupExpired();
       await recoverInterruptedSessions();
       if (navigator.storage?.persist) await navigator.storage.persist().catch(() => false);
       await renderRecordings();

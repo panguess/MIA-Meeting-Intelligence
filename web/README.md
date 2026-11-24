@@ -29,7 +29,9 @@ For an online meeting, place the iPhone near the laptop speaker. MIA records sou
 
 - iOS Safari and Home Screen web apps may pause or stop recording when sent to the background, when the screen locks, during a call, or when iOS needs resources. MIA cannot guarantee a complete meeting recording. Keep it in the foreground with the screen unlocked, and test short recordings on the actual iPhone first.
 - If iOS interrupts the page, MIA may recover audio chunks already written to IndexedDB and mark the result as possibly incomplete. It cannot recover sound the browser did not capture.
-- Browser storage may be cleared or evicted. Export important recordings after each meeting. The 90-day cleanup is best-effort and runs when the app opens; it is not a guaranteed retention policy.
+- Browser storage may be cleared or evicted. Export important recordings after each meeting. MIA marks each recording *Exported* or *Not exported* and shows a reminder for unexported recordings and for recordings older than 90 days. It never deletes a recording on its own.
+- While recording, MIA asks iOS to keep the screen on (Screen Wake Lock). If a call or app switch stops the recording anyway, the audio so far is saved and a **Resume** button records the next part.
+- After the first visit, the app opens offline from the service worker cache. Updates download the next time the app is opened while its server is reachable.
 - This prototype does not encrypt recordings at the application level. Use non-confidential audio.
 - Microphone access and Home Screen installation require an HTTPS origin. Offline app caching does not make recording reliable offline, and the app does not sync recordings.
 - Imports are optional and only read a file that the user chooses on the device. They are not uploaded.

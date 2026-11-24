@@ -2,7 +2,7 @@
 
 This is a **test-only** setup for whoever maintains MIA. It lets an iPhone open the PWA over HTTPS from a computer on the same Wi‑Fi, so the microphone and **Add to Home Screen** can be checked before any hosting is arranged. It needs no hosting, cloud, or app account and has no cost.
 
-It is not a hosting solution: the app is only reachable while the computer is on, the server is running, and the iPhone is on the same network.
+It is not a hosting solution. The computer is needed to **install or update** MIA. After MIA has been opened once from the computer (ideally from the Home Screen icon), it opens offline from the iPhone's cache, even when the computer is off or on another network.
 
 ## What stays the same
 
@@ -28,20 +28,24 @@ mkcert creates a private certificate authority (CA) on the computer. Once the iP
 
 ## Steps
 
-1. **Find the computer's LAN IP address.**
-   - macOS: `ipconfig getifaddr en0`
-   - Windows: `ipconfig` and read *IPv4 Address*
-   - Example used below: `192.168.1.20`
+1. **Find the computer's local name (use this, not the IP).**
+   - Windows: run `hostname` and add `.local`, in lower case. Example: `LAPTOP-30S5LPQP` → `laptop-30s5lpqp.local`
+   - macOS: **System Settings → General → Sharing → Local hostname** (already ends in `.local`)
+   - The test server also prints this name when it starts.
 
-2. **Create the test CA and a certificate** (from the repository root):
+   Why a name: the iPhone keeps MIA's recordings per address. An IP address changes between networks (home, office, café), and each new IP looks like a different, empty app. The `.local` name stays the same, so the recordings stay visible.
+
+   On Windows the Wi‑Fi network must be set to **Private** (Settings → Network & internet → Wi‑Fi → the network → *Private network*) so the iPhone can find the name.
+
+2. **Create the test CA and a certificate** (from the repository root). Use the name from step 1:
 
    ```sh
    mkcert -install
    mkdir -p .local-certs
-   mkcert -cert-file .local-certs/mia-lan.pem -key-file .local-certs/mia-lan-key.pem 192.168.1.20 localhost
+   mkcert -cert-file .local-certs/mia-lan.pem -key-file .local-certs/mia-lan-key.pem laptop-30s5lpqp.local localhost
    ```
 
-   `.local-certs/` is ignored by git.
+   `.local-certs/` is ignored by git. This certificate keeps working when the IP changes, so it is made only once.
 
 3. **Install the CA on the iPhone.**
    - Run `mkcert -CAROOT` and send `rootCA.pem` (not `rootCA-key.pem`) to the iPhone with AirDrop, or by email to yourself.
@@ -56,7 +60,7 @@ mkcert creates a private certificate authority (CA) on the computer. Once the iP
 
    It prints the address to open. If the computer's firewall asks, allow incoming connections for Python.
 
-5. **Test on the iPhone.** Open `https://192.168.1.20:8443/` in **Safari** and check:
+5. **Test on the iPhone.** Open `https://laptop-30s5lpqp.local:8443/` (your name from step 1) in **Safari** and check:
 
    | Check | Expected |
    |---|---|
@@ -66,8 +70,11 @@ mkcert creates a private certificate authority (CA) on the computer. Once the iP
    | Record 1–2 minutes, tap **Stop and save** | Recording appears in the list and plays back |
    | **Export** | Share sheet opens; saving to Files works |
    | **Share → Add to Home Screen**, then open from the icon | Opens full screen; recording again works |
-   | Lock the screen for ~30 seconds during a recording | Note what happens: stops, pauses, or marked possibly incomplete |
-   | Switch to another app during a recording, then return | Same as above |
+   | Leave the iPhone untouched for 3 minutes while recording | Screen stays on (MIA keeps it awake); timer keeps running |
+   | Switch to another app during a recording, then return | If recording stopped: status says it stopped and a large **Resume** button appears; tapping it records "part 2" |
+   | **Export** a recording | Its line changes from *Not exported* to *Exported* with the date |
+   | Delete a recording that was never exported | Stronger warning that it cannot be recovered |
+   | Stop the server (`Ctrl+C`), close MIA fully, then open it from the Home Screen icon | MIA still opens and the recordings are still listed |
    | Delete a recording | It disappears from the list |
 
    Record what you observe, including the iOS version. Use non-confidential audio only.
@@ -77,8 +84,13 @@ mkcert creates a private certificate authority (CA) on the computer. Once the iP
    - On the iPhone: **Settings → General → VPN & Device Management** → remove the mkcert profile.
    - Optional on the computer: `mkcert -uninstall`, then delete `.local-certs/`.
 
+## Updating MIA after a code change
+
+Start the server and open MIA on the iPhone while both are on the same Wi‑Fi. The new version downloads in the background. Close MIA fully and open it again to use it.
+
 ## Limits of this test
 
-- Home Screen icons installed from this address stop working when the server is off, and recordings stored under this address stay separate from those on any future hosted URL (browser storage is per address).
-- If the computer's IP changes, the certificate must be recreated for the new IP, and the iPhone sees it as a different app.
+- Recordings are tied to the address MIA was opened from. Always use the same `.local` name and port; opening MIA by IP, or in Safari instead of the Home Screen icon, shows a separate, empty list.
+- If the `.local` name does not open on the iPhone (some routers block it), the IP fallback printed by the server works, but recordings made through it are separate and the certificate must include that IP.
+- If the iPhone profile or the mkcert CA is removed, MIA still opens offline, but updating it needs the profile again.
 - Passing this test does not prove that long meetings record fully; iOS can still stop recording in the background or when the screen locks.
