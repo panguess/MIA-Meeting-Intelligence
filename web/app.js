@@ -678,7 +678,7 @@
           const handOff = (stay = false) => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
             Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText, series: sessionRows && sessionRows.series, gapSec: sessionRows && sessionRows.gapSec }))
-              .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
+              .catch(error => showWarning("The recording is saved, but the report didn't start (" + (error?.message || error?.name || "storage error") + "). Open Agent and tap the recording to try again."));
           };
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
@@ -724,7 +724,7 @@
   // restarted for as long as the recording runs. The audio is still recorded
   // as a backup ("Improve accuracy" re-listens to it).
   const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const live = { rec: null, on: false, lines: [], interim: "", failed: "", lastEvent: 0, dog: null, id: null };
+  const live = { rec: null, on: false, lines: [], interim: "", failed: "", lastEvent: 0, dog: null, id: null, all: new Set() };
   // Live lines are also kept in localStorage while recording, so a crash or an
   // iOS reload keeps the text of the recovered part.
   const liveKey = id => "mia-live-" + id;
@@ -747,9 +747,14 @@
     live.on = true;
     const run = () => {
       if (!live.on) return;
+      // Never more than one recogniser: an old one left running would keep
+      // the mic on (and keep writing text) after Stop.
+      liveKill();
       const r = new Speech();
+      live.all.add(r);
       r.lang = "th-TH"; r.continuous = true; r.interimResults = true;
       r.onresult = e => {
+        if (!live.on || r !== live.rec) { liveKillOne(r); return; }
         let interim = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i], text = (res[0] && res[0].transcript || "").trim();
@@ -767,10 +772,13 @@
           liveRender();
         }
       };
-      r.onend = () => { if (live.on) setTimeout(() => { if (live.on && !state.pausedAt) run(); }, 250); };
+      r.onend = () => {
+        live.all.delete(r);
+        if (live.on && r === live.rec) setTimeout(() => { if (live.on && r === live.rec && !state.pausedAt && state.recorder) run(); }, 250);
+      };
       live.rec = r;
       live.lastEvent = Date.now();
-      try { r.start(); } catch { setTimeout(() => { if (live.on && !state.pausedAt) run(); }, 1000); }
+      try { r.start(); } catch { setTimeout(() => { if (live.on && r === live.rec && !state.pausedAt && state.recorder) run(); }, 1000); }
     };
     live.run = run;
     run();
@@ -778,25 +786,32 @@
     // for 45 s while recording, start a fresh session.
     clearInterval(live.dog);
     live.dog = setInterval(() => {
-      if (!live.on || state.pausedAt) return;
-      if (Date.now() - live.lastEvent > 45000) {
-        try { live.rec && (live.rec.onend = null, live.rec.abort ? live.rec.abort() : live.rec.stop()); } catch {}
-        run();
-      }
+      if (!live.on || !state.recorder) { clearInterval(live.dog); return; }
+      if (state.pausedAt) return;
+      if (Date.now() - live.lastEvent > 45000) run();
     }, 15000);
     liveRender();
   }
+  function liveKillOne(r) {
+    if (!r) return;
+    r.onresult = r.onend = r.onerror = null;
+    try { r.abort ? r.abort() : r.stop(); } catch {}
+    live.all.delete(r);
+  }
+  function liveKill() {
+    for (const r of [...live.all]) liveKillOne(r);
+    live.rec = null;
+  }
   function livePause(paused) {
     if (!live.on && !live.rec) return;
-    if (paused) { try { live.rec && live.rec.stop(); } catch {} }
+    if (paused) liveKill();
     else if (live.on && live.run) { live.lastEvent = Date.now(); live.run(); }
   }
   function liveStop() {
     live.on = false;
     clearInterval(live.dog);
     if (live.interim) { live.lines.push({ at: Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
-    try { live.rec && live.rec.stop(); } catch {}
-    live.rec = null;
+    liveKill();
     const text = liveAsText(live.lines);
     if (live.id) { try { localStorage.removeItem(liveKey(live.id)); } catch {} }
     live.id = null;
@@ -824,6 +839,8 @@
   function stopRecording() {
     if (state.recorder && state.recorder.state !== "inactive") {
       state.userStopped = true;
+      // Turn live text off at once (privacy): no more listening after Stop.
+      live.on = false; clearInterval(live.dog); liveKill();
       state.recorder.stop();
     }
   }

@@ -207,10 +207,29 @@
       const t = state.db.transaction(STORE, mode);
       const r = fn(t.objectStore(STORE));
       t.oncomplete = () => resolve(r && r.result);
-      t.onerror = () => reject(t.error);
+      const fail = () => reject(t.error || (r && r.error) || new Error("This iPhone couldn't save it (storage error)"));
+      t.onerror = fail; t.onabort = fail;
     });
   }
-  const saveJob = job => tx("readwrite", s => s.put(job));
+  // iOS Safari can refuse to store a Blob that was itself read from another
+  // database (it rejects with no error). Retry once with a fresh in-memory copy.
+  async function saveJob(job) {
+    try { return await tx("readwrite", s => s.put(job)); }
+    catch (e) {
+      if (!(job.audio instanceof Blob)) throw e;
+      if (!job.audioCopied) {
+        try {
+          job.audio = new Blob([await job.audio.arrayBuffer()], { type: job.audio.type });
+          job.audioCopied = true;
+          return await tx("readwrite", s => s.put(job));
+        } catch {}
+      }
+      // Last resort: save everything except the audio (the recording itself is
+      // still kept in the Record tab), so the report is never blocked.
+      const { audio, ...rest } = job;
+      return tx("readwrite", s => s.put({ ...rest, audioNotSaved: true }));
+    }
+  }
   const deleteJob = id => tx("readwrite", s => s.delete(id));
   const loadJobs = () => tx("readonly", s => s.getAll());
 
