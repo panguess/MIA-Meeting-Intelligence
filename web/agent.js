@@ -561,8 +561,11 @@
     state.tab = job.minutes ? "minutes" : "transcript";
     showView("agent");
     render();
-    if (!existing && TRANSCRIBER.ready) processJob(job);
-    else if (!existing && opts.recordId) openSetup();  // after Stop with no key yet: show setup right away
+    // Start (or continue) unless the minutes are done or it's already running.
+    if (!job.minutes && running !== job.id) {
+      if (TRANSCRIBER.ready) processJob(job);
+      else openSetup();
+    }
     return job;
   }
 

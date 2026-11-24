@@ -49,7 +49,7 @@
       notExported: "Not exported",
       exportedOn: "Exported",
       exportedMark: "Marked as exported",
-      reminderUnexported: "{n} recording(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
+      reminderUnexported: "{n} recording(s) without a backup. iOS can clear browser storage; for important meetings tap Export → Save to Files.",
       reminderOld: "{n} recording(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they're exported.",
       resume: "Resume",
       pause: "Pause",
@@ -71,7 +71,7 @@
       export: "Export",
       delete: "Delete",
       live: "Recorded",
-      incomplete: "May have gaps",
+      incomplete: "MIA left the screen · check audio",
       importedType: "Imported",
       unknownDate: "Unknown date",
       fileLarge: "This file is larger than the 1 GB limit.",
@@ -436,9 +436,9 @@
         button.addEventListener("click", handler);
         actions.append(button);
       };
+      action("Minutes", ICONS.text, "primary", () => sendToAgent(record.id));
       action(t("play"), ICONS.play, "", () => playRecord(record.id));
-      action(t("export"), ICONS.share, "export", () => exportRecord(record.id));
-      action(record.transcript ? t("transcriptShort") : "Minutes", ICONS.text, record.transcript ? "has-transcript" : "", () => record.transcript ? openTranscript(record.id) : sendToAgent(record.id));
+      action(t("export"), ICONS.share, "", () => exportRecord(record.id));
       action(t("rename"), ICONS.pencil, "", () => renameRecord(record.id));
       action(t("delete"), ICONS.trash, "danger", () => deleteRecord(record.id));
 
@@ -642,6 +642,14 @@
         try {
           await saveRecording(record);
           await deleteSessionData(recordingId);
+          // Hand the recording to the Agent so the transcript and minutes start by
+          // themselves. If iOS stopped it (call, lock), the user can still Resume;
+          // the Agent then gets this first part only when they tap Minutes.
+          const handOff = () => {
+            if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds }))
+              .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
+          };
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
             offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
@@ -649,8 +657,7 @@
             setStatus(t("saved"), false);
             if (!wasPossiblyInterrupted) clearWarning();
             else showWarning(t("interruption"));
-            // Hand the recording to the Agent: transcript and minutes start by themselves.
-            window.MIAAgent?.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds });
+            handOff();
           }
         } catch (error) {
           setStatus(t("ready"), false);

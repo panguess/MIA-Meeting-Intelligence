@@ -112,6 +112,12 @@
 
     /* iPhone limits */
     .limits h2{font-size:20px}
+    .limits summary{display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;cursor:pointer;min-height:28px}
+    .limits summary::-webkit-details-marker{display:none}
+    .limits .chev{width:30px;height:30px;border-radius:50%;border:var(--line);display:grid;place-items:center;font-weight:800;flex:none}
+    .limits[open] .chev{transform:rotate(45deg)}
+    .limits[open] summary{margin-bottom:6px}
+    .action.primary{background:var(--coral);color:#fff}
     .limits .lead{margin:4px 0 14px;color:var(--muted);font-size:14px}
     .tip-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
     .tip-list li{display:flex;gap:12px;align-items:flex-start}
@@ -304,6 +310,7 @@
     .setup-actions{display:flex;flex-direction:column;align-items:center}
     .setup-actions .go{margin-bottom:4px}
     .danger-text{color:#b3261e}
+    .view-agent{padding-bottom:40px}
     .danger-link{display:block;margin:6px auto 0;border:0;background:transparent;color:#b3261e;font-weight:800;font-size:14px;padding:10px}
 
     @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -357,8 +364,8 @@
     <div class="stat sun"><b id="statUnexported">0</b><span>To export</span></div>
   </div>
 
-  <section class="card limits" aria-labelledby="limitsTitle">
-    <h2 id="limitsTitle">iPhone recording limits</h2>
+  <details class="card limits">
+    <summary><h2 id="limitsTitle">Tips for a complete recording</h2><span class="chev" aria-hidden="true">+</span></summary>
     <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
     <ul class="tip-list">
       <li><span class="tip-icon" style="background:var(--peach)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
@@ -368,9 +375,9 @@
       <li><span class="tip-icon" style="background:var(--sun)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
         <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
       <li><span class="tip-icon" style="background:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
-        <div><strong>Export after every meeting</strong><span>iOS can clear browser storage. Tap Export, then Save to Files. For a transcript, save it to OneDrive › Desktop › MIA › Inbox.</span></div></li>
+        <div><strong>Keep a backup</strong><span>iOS can clear browser storage. For an important meeting, tap Export → Save to Files as a backup copy.</span></div></li>
     </ul>
-  </section>
+  </details>
 
   <section class="card" aria-labelledby="libraryTitle">
     <div class="section-head"><h2 id="libraryTitle" data-i18n="library">My recordings</h2><span class="count" id="recordCount">0</span></div>
@@ -385,11 +392,6 @@
       <span class="row-text"><strong data-i18n="chooseFile">Import an audio file</strong><span data-i18n="importCopy">From the Files app. Saved in MIA on this iPhone.</span></span>
       <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
     </button>
-    <div class="divider"></div>
-    <div class="row-button">
-      <span class="row-icon" style="background:var(--sun)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span>
-      <span class="row-text"><strong data-i18n="transcriptTitle">Get a transcript</strong><span data-i18n="transcriptCopy">Export → Save to Files → OneDrive › Desktop › MIA › Inbox. Your laptop writes the transcript back to that folder, then tap Text on the recording to add it.</span></span>
-    </div>
     <div class="divider"></div>
     <div class="row-button">
       <span class="row-icon sky"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
@@ -419,7 +421,7 @@
   <footer class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.6.2</p>
+    <p>MIA prototype · v0.6.3</p>
   </footer>
  </div>
  <div class="view-agent">
