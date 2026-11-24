@@ -1,6 +1,6 @@
 import Foundation
 
-enum RecordingOrigin: String, Codable {
+enum RecordingOrigin: String, Codable, Equatable {
     case liveIPhoneRecording
     case iPhoneImport
 }
