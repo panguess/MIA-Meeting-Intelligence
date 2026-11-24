@@ -2,8 +2,10 @@
   "use strict";
 
   const DB_NAME = "mia-local-recordings";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_NAME = "recordings";
+  const CHUNK_STORE = "recording_chunks";
+  const SESSION_STORE = "recording_sessions";
   const RETENTION_DAYS = 90;
   const MAX_RECORDING_BYTES = 1024 * 1024 * 1024; // 1 GiB guardrail; actual browser quota may be lower.
 
@@ -39,6 +41,7 @@
       export: "ส่งออก",
       delete: "ลบ",
       live: "บันทึกสด",
+      incomplete: "เสียงอาจขาดช่วง · ตรวจสอบไฟล์",
       importedType: "นำเข้า",
       unknownDate: "ไม่ทราบวันที่",
       fileLarge: "ไฟล์มีขนาดใหญ่เกินขีดจำกัดของต้นแบบ 1 GiB",
@@ -80,6 +83,7 @@
       export: "Export",
       delete: "Delete",
       live: "Live recording",
+      incomplete: "Possibly incomplete · review audio",
       importedType: "Imported",
       unknownDate: "Unknown date",
       fileLarge: "File exceeds the prototype's 1 GiB limit",
@@ -99,6 +103,8 @@
     recorder: null,
     stream: null,
     chunks: [],
+    chunkSequence: 0,
+    chunkWriteQueue: Promise.resolve(),
     startedAt: null,
     timerHandle: null,
     elapsedTimer: null,
@@ -155,6 +161,13 @@
           const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
           store.createIndex("createdAt", "createdAt", { unique: false });
         }
+        if (!db.objectStoreNames.contains(CHUNK_STORE)) {
+          const chunks = db.createObjectStore(CHUNK_STORE, { keyPath: ["recordingId", "index"] });
+          chunks.createIndex("recordingId", "recordingId", { unique: false });
+        }
+        if (!db.objectStoreNames.contains(SESSION_STORE)) {
+          db.createObjectStore(SESSION_STORE, { keyPath: "id" });
+        }
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error("IndexedDB open failed"));
@@ -162,10 +175,10 @@
     });
   }
 
-  function dbRequest(mode, action) {
+  function dbRequest(mode, action, storeName = STORE_NAME) {
     return new Promise((resolve, reject) => {
-      const tx = state.db.transaction(STORE_NAME, mode);
-      const store = tx.objectStore(STORE_NAME);
+      const tx = state.db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
       let request;
       try {
         request = action(store);
@@ -186,6 +199,44 @@
 
   async function getAllRecordings() {
     return (await dbRequest("readonly", store => store.getAll())) || [];
+  }
+
+  async function getChunks(recordingId) {
+    return (await dbRequest("readonly", store => store.index("recordingId").getAll(recordingId), CHUNK_STORE)) || [];
+  }
+
+  async function deleteSessionData(recordingId) {
+    const rows = await getChunks(recordingId);
+    for (const row of rows) {
+      await dbRequest("readwrite", store => store.delete([recordingId, row.index]), CHUNK_STORE);
+    }
+    await dbRequest("readwrite", store => store.delete(recordingId), SESSION_STORE);
+  }
+
+  async function recoverInterruptedSessions() {
+    const sessions = (await dbRequest("readonly", store => store.getAll(), SESSION_STORE)) || [];
+    for (const session of sessions) {
+      const rows = await getChunks(session.id);
+      const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
+        type: session.mimeType || "application/octet-stream"
+      });
+      if (blob.size > 0) {
+        const now = Date.now();
+        await saveRecording({
+          id: session.id,
+          title: (session.title || "MIA") + (state.language === "th" ? " [กู้คืน · อาจไม่สมบูรณ์]" : " [Recovered · possibly incomplete]"),
+          fileName: session.fileName,
+          origin: "live",
+          createdAt: now,
+          durationSeconds: Math.max(0, (now - session.startedAt) / 1000),
+          mimeType: blob.type,
+          blob,
+          size: blob.size,
+          incomplete: true
+        });
+      }
+      await deleteSessionData(session.id);
+    }
   }
 
   function formatDuration(seconds) {
@@ -248,6 +299,7 @@
         record.origin === "imported" ? t("importedType") : t("live"),
         formatDate(record.createdAt),
         formatDuration(record.durationSeconds),
+        record.incomplete ? t("incomplete") : "",
         humanBytes(record.blob?.size || 0)
       ].join(" · ");
 
@@ -330,14 +382,36 @@
 
       state.stream = stream;
       state.chunks = [];
+      state.chunkSequence = 0;
+      state.chunkWriteQueue = Promise.resolve();
+      state.pendingWarning = false;
       state.startedAt = Date.now();
       state.recordingId = crypto.randomUUID();
+
+      const title = (el("meetingTitle").value || "").trim();
+      const extension = fileExtension(mimeType);
+      const fileName = "MIA-" + new Date(state.startedAt).toISOString().replace(/[:.]/g, "-") + "." + extension;
+      await dbRequest("readwrite", store => store.put({
+        id: state.recordingId,
+        title,
+        fileName,
+        startedAt: state.startedAt,
+        mimeType
+      }), SESSION_STORE);
 
       const recorder = new MediaRecorder(stream, { mimeType });
       state.recorder = recorder;
 
       recorder.addEventListener("dataavailable", event => {
-        if (event.data && event.data.size > 0) state.chunks.push(event.data);
+        if (!event.data || event.data.size === 0 || !state.recordingId) return;
+        const recordingId = state.recordingId;
+        const index = state.chunkSequence++;
+        state.chunkWriteQueue = state.chunkWriteQueue
+          .then(() => dbRequest("readwrite", store => store.put({ recordingId, index, blob: event.data }), CHUNK_STORE))
+          .catch(error => {
+            state.pendingWarning = true;
+            showWarning(t("storageFailed") + " " + (error?.message || ""));
+          });
       });
 
       recorder.addEventListener("error", event => {
@@ -346,41 +420,54 @@
 
       recorder.addEventListener("stop", async () => {
         const endedAt = Date.now();
-        const durationSeconds = (endedAt - state.startedAt) / 1000;
-        const blob = new Blob(state.chunks, { type: recorder.mimeType || mimeType });
+        const recordingId = state.recordingId;
+        const startedAt = state.startedAt || endedAt;
+        const wasPossiblyInterrupted = state.pendingWarning;
+        await state.chunkWriteQueue;
+        const rows = recordingId ? await getChunks(recordingId) : [];
+        const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
+          type: recorder.mimeType || mimeType
+        });
+        const sessionRows = recordingId
+          ? await dbRequest("readonly", store => store.get(recordingId), SESSION_STORE)
+          : null;
         stopTracks();
 
         state.recorder = null;
         state.chunks = [];
         state.startedAt = null;
         state.recordingId = null;
+        state.pendingWarning = false;
         stopTimer();
 
-        if (!blob.size) {
+        if (!blob.size || !recordingId) {
+          if (recordingId) await deleteSessionData(recordingId);
           setStatus(t("ready"), false);
           showWarning(t("noAudio"));
           return;
         }
 
-        const safeTitle = (el("meetingTitle").value || "").trim();
-        const extension = fileExtension(blob.type);
-        const id = crypto.randomUUID();
+        const title = sessionRows?.title || (state.language === "th" ? "การประชุม" : "Meeting");
+        const fileName = sessionRows?.fileName || ("MIA-" + new Date(endedAt).toISOString().replace(/[:.]/g, "-") + "." + fileExtension(blob.type));
         const record = {
-          id,
-          title: safeTitle || (state.language === "th" ? "การประชุม" : "Meeting"),
-          fileName: "MIA-" + new Date(endedAt).toISOString().replace(/[:.]/g, "-") + "." + extension,
+          id: recordingId,
+          title,
+          fileName,
           origin: "live",
           createdAt: endedAt,
-          durationSeconds,
+          durationSeconds: Math.max(0, (endedAt - startedAt) / 1000),
           mimeType: blob.type || "application/octet-stream",
           blob,
-          size: blob.size
+          size: blob.size,
+          incomplete: wasPossiblyInterrupted
         };
 
         try {
           await saveRecording(record);
+          await deleteSessionData(recordingId);
           setStatus(t("saved"), false);
-          clearWarning();
+          if (!wasPossiblyInterrupted) clearWarning();
+          else showWarning(t("interruption"));
         } catch (error) {
           setStatus(t("ready"), false);
           showWarning(t("storageFailed") + " " + (error?.message || ""));
@@ -572,6 +659,8 @@
     try {
       state.db = await openDatabase();
       await cleanupExpired();
+      await recoverInterruptedSessions();
+      if (navigator.storage?.persist) await navigator.storage.persist().catch(() => false);
       await renderRecordings();
     } catch (error) {
       showWarning(t("dbError") + ": " + (error?.message || ""));
