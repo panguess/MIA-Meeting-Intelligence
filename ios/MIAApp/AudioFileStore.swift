@@ -99,7 +99,8 @@ final class AudioFileStore {
         )
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
-        try? url.setResourceValues(values)
+        var mutableURL = url
+        try? mutableURL.setResourceValues(values)
     }
 
     private func prepareDirectoryOnly() throws {
