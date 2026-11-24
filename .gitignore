@@ -2,3 +2,5 @@
 .local-certs/
 *.pem
 __pycache__/
+.venv/
+*.partial

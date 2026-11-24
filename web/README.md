@@ -38,6 +38,8 @@ For an online meeting, place the iPhone near the laptop speaker. MIA records sou
 
 ## Current scope
 
-Implemented: live microphone recording, local IndexedDB storage, recovery of saved chunks, optional local audio import, playback, export, deletion, rename, and an English interface designed for iPhone.
+Implemented: live microphone recording, local IndexedDB storage, recovery of saved chunks, optional local audio import, playback, export, deletion, rename, attaching and reading a transcript, and an English interface designed for iPhone.
 
-Not implemented: transcription, summaries, action items, cloud sync, remote processing, meeting-platform connection, guaranteed background recording, or a hosted production URL.
+Transcripts are made on the user's own Windows laptop, not in the app: export the recording to `OneDrive › Desktop › MIA › Inbox`, the laptop transcriber writes `<name>.transcript.txt` back to that folder, then tap **Transcript** on the recording and pick that file. See [the laptop transcriber](../tools/transcriber/README.md).
+
+Not implemented: on-iPhone transcription, summaries, action items, cloud sync, remote processing, meeting-platform connection, guaranteed background recording, or a hosted production URL.
