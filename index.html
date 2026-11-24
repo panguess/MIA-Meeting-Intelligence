@@ -395,7 +395,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.14.1</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.14.2</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -469,7 +469,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.14.1</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.14.2</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -556,7 +556,7 @@
      <div id="minutesFilled" class="hidden">
       <div class="opt-row">
        <div class="pill-toggle" id="jobOut" role="group" aria-label="Minutes language"><button type="button" data-out="th" aria-pressed="true">Thai</button><button type="button" data-out="en" aria-pressed="false">English</button></div>
-       <div class="pill-toggle" id="jobKind" role="group" aria-label="Recording type"><button type="button" data-kind="meeting" aria-pressed="true">Meeting</button><button type="button" data-kind="talk" aria-pressed="false">Talk</button></div>
+       <div class="pill-toggle" id="jobKind" role="group" aria-label="Recording type"><button type="button" data-kind="meeting" aria-pressed="true">Meeting</button><button type="button" data-kind="talk" aria-pressed="false">Class</button><button type="button" data-kind="field" aria-pressed="false">Field</button><button type="button" data-kind="other" aria-pressed="false">Other</button></div>
        <span class="sr-only" id="kindNote"></span>
       </div>
       <div class="m-stats" id="mStats"><div class="sun"><b id="statDecisions">0</b><span>Decisions</span></div><div class="lilac"><b id="statActions">0</b><span>Actions</span></div><div class="peach"><b id="statRisks">0</b><span>Risks</span></div></div>
@@ -626,10 +626,11 @@
   </details>
    <p class="set-note"><strong>Stop the mic question?</strong> On iPhone open Settings → Apps → Safari → Microphone → Allow. Safari then stops asking each time.</p>
    <p class="set-note"><strong>Online meeting?</strong> Place your iPhone near the laptop speaker. MIA records the room sound.</p>
+   <p class="set-note" id="modelNote"></p>
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.14.1</p>
+    <p>MIA prototype · v0.14.2</p>
   </div>
    </div>
   </dialog>
