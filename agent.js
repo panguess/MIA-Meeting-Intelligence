@@ -263,7 +263,7 @@
   // ---------- list view ----------
   function renderList() {
     const list = $("agentJobs");
-    const jobs = [...state.jobs].sort((a, b) => b.createdAt - a.createdAt);
+    const jobs = state.jobs.filter(j => !j.parentId).sort((a, b) => b.createdAt - a.createdAt);
     $("agentJobCount").textContent = jobs.length;
     if (!jobs.length) {
       list.innerHTML = '<div class="empty"><div class="empty-face" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>' +
@@ -783,6 +783,46 @@
     toast("Minutes ready");
   }
 
+  // ---------- One report per session ----------
+  // A call or lock splits a recording into parts. Each later part is
+  // transcribed as a hidden job, then joined to the first part's transcript
+  // with a gap line and shifted times, and the report is rewritten once.
+  const shiftLines = (text, off) => text.split("\n")
+    .filter(l => !/\(Recording paused for about[^)]*\)/.test(l))
+    .map(l => l.replace(/^\[((?:\d+:)?\d+:\d+)\]/, (m, t) => "[" + stamp(secOf(t) + off) + "]")).join("\n");
+  function composeSeries(job) {
+    if (!(job.childIds || []).length) return;
+    if (job.ownDuration == null) job.ownDuration = job.duration || 0;
+    if (job.ownMarks == null) job.ownMarks = job.marks || [];
+    let text = job.ownTranscript || "", off = job.ownDuration, marks = [...job.ownMarks];
+    let joined = 0;
+    for (const id of job.childIds) {
+      const c = state.jobs.find(j => j.id === id);
+      if (!c || c.status !== "done" || !c.transcript) continue;
+      off += c.gapSec || 0;
+      const g = c.gapSec || 0, gap = g < 60 ? Math.max(1, g) + " s" : Math.round(g / 60) + " min";
+      text += "\n[" + stamp(off) + "] (Recording paused for about " + gap + " because of an interruption, e.g. a phone call. Anything said during the gap is missing.)\n" + shiftLines(c.transcript, off);
+      marks = marks.concat((c.marks || []).map(m => m + off));
+      off += c.duration || 0;
+      joined++;
+    }
+    if (!joined) return;
+    job.transcript = text; job.duration = off; job.marks = marks;
+    // Notes per 5-minute part would miss the later parts, so the minutes are
+    // written from the joined transcript instead.
+    job.parts = (job.parts || []).map(p => ({ ...p, notes: undefined }));
+  }
+  async function childDone(job) {
+    job.status = "done"; job.progress = 100; job.stage = "";
+    await saveJob(job);
+    const parent = state.jobs.find(j => j.id === job.parentId);
+    if (parent && parent.transcriptComplete) {
+      parent.minutes = ""; parent.status = "queued";
+      await saveJob(parent);
+      toast("Joined the next part. Updating the report…");
+    }
+  }
+
   async function processJob(job) {
     if (running) {
       if (job.status !== "queued") { job.status = "queued"; await saveJob(job); render(); }
@@ -796,6 +836,9 @@
     let stepsDone = 0;
     try {
       if (job.transcriptComplete) {
+        if (job.parentId) return await childDone(job);
+        if (job.ownTranscript == null) job.ownTranscript = job.transcript;
+        composeSeries(job);
         job.stage = "minutes"; render();
         job.minutes = await writeMinutes(job);
         job.status = "done"; job.progress = 100; job.stage = "";
@@ -867,6 +910,9 @@
       }
       if (!job.transcript.trim()) throw new Error("No speech was found in this recording.");
       job.transcriptComplete = true;
+      if (job.parentId) return await childDone(job);
+      job.ownTranscript = job.transcript; job.ownParts = null;
+      composeSeries(job);
       await saveJob(job);
       job.stage = "minutes"; render();
       job.minutes = await writeMinutes(job);
@@ -948,6 +994,8 @@
     if (blob.size > MAX_AUDIO_BYTES) return toast("This file is too large (over 500 MB).");
     if (!state.db) { try { state.db = await openDb(); state.jobs = await loadJobs(); } catch { return toast("Storage isn't available in this browser."); } }
     const existing = opts.recordId && state.jobs.find(j => j.recordId === opts.recordId);
+    // A later part of the same session (after a call or lock): one report.
+    const parent = !existing && opts.series && state.jobs.find(j => !j.parentId && j.recordId === opts.series);
     let job = existing;
     if (!job) {
       job = {
@@ -959,12 +1007,18 @@
         duration: opts.duration || await audioDuration(blob),
         status: "queued", progress: 0, transcript: "", minutes: "", parts: [], ...liveFields(opts)
       };
+      if (parent) {
+        job.parentId = parent.id; job.gapSec = opts.gapSec || 0;
+        parent.childIds = [...(parent.childIds || []), job.id];
+        await saveJob(parent);
+      }
       await saveJob(job);
       state.jobs.push(job);
     }
+    const shown = job.parentId ? state.jobs.find(j => j.id === job.parentId) || job : job;
     if (!opts.stay) {
-      state.openId = job.id;
-      state.tab = job.minutes ? "minutes" : "transcript";
+      state.openId = shown.id;
+      state.tab = shown.minutes ? "minutes" : "transcript";
       showView("agent");
     }
     render();
@@ -1034,7 +1088,8 @@
     const job = state.jobs.find(j => j.id === state.openId);
     if (!job || !window.confirm("Delete this job? The audio, transcript and minutes will be removed from MIA.")) return;
     await deleteJob(job.id);
-    state.jobs = state.jobs.filter(j => j.id !== job.id);
+    for (const id of job.childIds || []) await deleteJob(id);
+    state.jobs = state.jobs.filter(j => j.id !== job.id && j.parentId !== job.id);
     state.openId = null;
     render();
   }
