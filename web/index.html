@@ -210,6 +210,10 @@
     .drop h2{font-size:27px;line-height:1.1}
     .drop p{margin:0;font-size:14px;max-width:270px;opacity:.96}
     .drop .btn{background:#fff;color:var(--ink);margin-top:2px}
+    .seg-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .out-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+    .out-row .field-label{margin:0;white-space:nowrap}
+    .out-row .seg{flex:1;margin:0}
     .seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:5px;background:#fff;border:var(--line);border-radius:999px;margin-bottom:16px}
     .seg button{min-height:44px;border:0;border-radius:999px;background:transparent;font-size:14px;font-weight:800;padding:0 4px}
     .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
@@ -421,7 +425,7 @@
   <footer class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.6.3</p>
+    <p>MIA prototype · v0.6.4</p>
   </footer>
  </div>
  <div class="view-agent">
@@ -451,6 +455,12 @@
     <button type="button" data-lang="th" aria-pressed="true">Thai</button>
     <button type="button" data-lang="mix" aria-pressed="false">Thai + English</button>
     <button type="button" data-lang="en" aria-pressed="false">English</button>
+   </div>
+
+   <span class="field-label">Minutes language</span>
+   <div class="seg seg-2" id="agentOut" role="group" aria-label="Minutes language">
+    <button type="button" data-out="th" aria-pressed="true">Thai</button>
+    <button type="button" data-out="en" aria-pressed="false">English</button>
    </div>
 
    <section class="svc">
@@ -494,6 +504,11 @@
      <div><h3 id="workTitle"></h3><p id="workSub"></p></div>
      <div class="work-stats"><div><span>Time left</span><b id="workLeft">–</b></div><div><span>Heard so far</span><b id="workHeard">–</b></div></div>
     </section>
+    <div id="jobLangWrap"><span class="field-label">Language of this meeting</span><div class="seg" id="jobLangs" role="group" aria-label="Meeting language">
+    <button type="button" data-lang="th" aria-pressed="true">Thai</button>
+    <button type="button" data-lang="mix" aria-pressed="false">Thai + English</button>
+    <button type="button" data-lang="en" aria-pressed="false">English</button>
+   </div></div>
     <button class="btn go" id="workGo" type="button">Start</button>
     <ol class="steps" id="workSteps"></ol>
     <div class="live hidden" id="livePreview"><b>Live preview</b><span id="livePreviewText"></span></div>
@@ -512,6 +527,10 @@
       <button class="link-btn" id="pasteMinutes" type="button">Or paste minutes from Claude</button>
      </div>
      <div id="minutesFilled" class="hidden">
+      <div class="out-row"><span class="field-label">Minutes in</span><div class="seg seg-2" id="jobOut" role="group" aria-label="Minutes language">
+    <button type="button" data-out="th" aria-pressed="true">Thai</button>
+    <button type="button" data-out="en" aria-pressed="false">English</button>
+   </div></div>
       <div class="m-stats"><div class="sun"><b id="statDecisions">0</b><span>Decisions</span></div><div class="lilac"><b id="statActions">0</b><span>Actions</span></div><div class="peach"><b id="statRisks">0</b><span>Risks</span></div></div>
       <div class="paper minutes" id="minutesBody"></div>
       <div class="refine">

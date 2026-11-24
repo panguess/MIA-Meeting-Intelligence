@@ -64,7 +64,10 @@
     "Output only the Markdown. No introduction."
   ].join("\n");
 
-  const state = { jobs: [], openId: null, tab: "transcript", lang: "th", db: null };
+  const LANG_NAME = { th: "Thai", mix: "Thai + English", en: "English" };
+  const savedLang = (() => { try { return localStorage.getItem("mia-lang"); } catch { return null; } })();
+  const savedOut = (() => { try { return localStorage.getItem("mia-out-lang"); } catch { return null; } })();
+  const state = { jobs: [], openId: null, tab: "transcript", lang: LANG_NAME[savedLang] ? savedLang : "th", out: savedOut === "en" ? "en" : "th", db: null };
   const $ = id => document.getElementById(id);
 
   // ---------- storage ----------
@@ -223,9 +226,12 @@
     const s = statusOf(job);
     $("detailPill").textContent = s.label;
     $("detailPill").className = "detail-pill " + s.tone;
-    $("detailMeta").textContent = [fmtDate(job.createdAt), fmtDur(job.duration), job.lang === "en" ? "English" : job.lang === "mix" ? "Thai + English" : "Thai"].filter(Boolean).join(" · ");
+    $("detailMeta").textContent = [fmtDate(job.createdAt), fmtDur(job.duration), LANG_NAME[job.lang] || "Thai"].filter(Boolean).join(" · ");
 
     const done = !!job.transcript && (job.transcriptComplete || job.status === "done");
+    const canSwitch = job.status !== "working" && !(job.parts && job.parts.length);
+    $("jobLangWrap").classList.toggle("hidden", !canSwitch);
+    for (const x of $("jobLangs").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.lang === job.lang));
     $("detailWorking").classList.toggle("hidden", done);
     $("detailTabs").classList.toggle("hidden", !done);
     $("detailResult").classList.toggle("hidden", !done);
@@ -294,6 +300,8 @@
         $("statActions").textContent = st.actions;
         $("statRisks").textContent = st.risks;
         $("minutesBody").innerHTML = renderMinutes(job.minutes);
+        const out = job.outLang || (job.lang === "en" ? "en" : "th");
+        for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
       }
       $("barPrimary").innerHTML = "<span>" + (has ? "Copy minutes" : "Copy for summary") + "</span>";
       $("barPrimary").dataset.act = has ? "copyMinutes" : "copySummary";
@@ -411,7 +419,8 @@
   // Shrinks notes until they fit one request, then writes the minutes.
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
-    if (transcript.length <= ONE_SHOT_CHARS) return chat(FINAL_PROMPT, "Transcript:\n" + transcript, 2500);
+    const prompt = FINAL_PROMPT + "\nWrite the minutes in " + ((job.outLang || (job.lang === "en" ? "en" : "th")) === "en" ? "English" : "Thai") + ", even if the meeting was in another language (headings stay in English).";
+    if (transcript.length <= ONE_SHOT_CHARS) return chat(prompt, "Transcript:\n" + transcript, 2500);
     let notes = job.parts.map((p, i) => "Part " + (i + 1) + " (from " + stamp(i * PART_SECONDS) + "):\n" + (p.notes || ""));
     while (notes.join("\n\n").length > NOTES_BATCH_CHARS && notes.length > 1) {
       const groups = [];
@@ -425,7 +434,7 @@
       for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes, keep every decision, action and risk:\n\n" + g.join("\n\n"), 900));
       notes = merged;
     }
-    return chat(FINAL_PROMPT, "Meeting notes, in order:\n\n" + notes.join("\n\n"), 2500);
+    return chat(prompt, "Meeting notes, in order:\n\n" + notes.join("\n\n"), 2500);
   }
 
   let running = null;
@@ -548,7 +557,7 @@
     if (!job) {
       job = {
         id: "job-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        name: name || "Meeting " + fmtDate(Date.now()), createdAt: Date.now(), lang: state.lang,
+        name: name || "Meeting " + fmtDate(Date.now()), createdAt: Date.now(), lang: state.lang, outLang: state.out,
         recordId: opts.recordId || null,
         audio: blob, audioType: blob.type, size: blob.size,
         duration: opts.duration || await audioDuration(blob),
@@ -618,11 +627,51 @@
     $("navAgent").addEventListener("click", () => showView("agent"));
     $("agentPick").addEventListener("click", () => $("agentFile").click());
     $("agentFile").addEventListener("change", e => { addFile(e.target.files[0]); e.target.value = ""; });
-    $("agentLangs").addEventListener("click", e => {
+    // Language: default for new jobs (remembered), shown in Record and Agent;
+    // a job that hasn't started can also be switched on its own page.
+    const syncLangs = () => {
+      for (const x of $("agentOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === state.out));
+      for (const id of ["agentLangs"]) for (const x of $(id).querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.lang === state.lang));
+    };
+    const pickDefault = e => {
       const b = e.target.closest("button[data-lang]");
       if (!b) return;
       state.lang = b.dataset.lang;
-      for (const x of $("agentLangs").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+      try { localStorage.setItem("mia-lang", state.lang); } catch {}
+      syncLangs();
+    };
+    $("agentLangs").addEventListener("click", pickDefault);
+    $("agentOut").addEventListener("click", e => {
+      const b = e.target.closest("button[data-out]");
+      if (!b) return;
+      state.out = b.dataset.out;
+      try { localStorage.setItem("mia-out-lang", state.out); } catch {}
+      syncLangs();
+    });
+    // Switch the minutes language of one meeting: rewrites only the minutes.
+    $("jobOut").addEventListener("click", async e => {
+      const b = e.target.closest("button[data-out]");
+      const job = state.jobs.find(j => j.id === state.openId);
+      if (!b || !job || job.status === "working") return;
+      const cur = job.outLang || (job.lang === "en" ? "en" : "th");
+      if (cur === b.dataset.out) return;
+      job.outLang = b.dataset.out;
+      job.minutes = "";
+      await saveJob(job);
+      render();
+      if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
+    });
+    syncLangs();
+    $("jobLangs").addEventListener("click", async e => {
+      const b = e.target.closest("button[data-lang]");
+      const job = state.jobs.find(j => j.id === state.openId);
+      if (!b || !job || job.status === "working") return;
+      if (job.lang !== b.dataset.lang) {
+        job.lang = b.dataset.lang;
+        job.parts = []; job.transcript = ""; job.transcriptComplete = false; job.minutes = ""; job.progress = 0; job.status = "queued";
+        await saveJob(job);
+      }
+      render();
     });
     $("agentJobs").addEventListener("click", e => {
       const b = e.target.closest("[data-job]");
