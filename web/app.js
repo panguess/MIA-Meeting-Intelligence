@@ -46,6 +46,11 @@
       reminderOld: "มี {n} ไฟล์เก่าเกิน 90 วัน MIA จะไม่ลบเอง เมื่อส่งออกเก็บไว้แล้วให้กด ลบ ด้วยตัวเอง",
       resume: "อัดต่อ",
       pause: "พักชั่วคราว",
+      rename: "แก้ชื่อ",
+      renamePrompt: "ชื่อการประชุม",
+      renamed: "แก้ชื่อแล้ว",
+      meetingWord: "ประชุม",
+      titlePlaceholder: "เว้นว่างได้ จะตั้งชื่อตามวันเวลาให้ แก้ทีหลังได้",
       unpause: "บันทึกต่อ",
       paused: "พักการบันทึกอยู่ · แตะ บันทึกต่อ",
       resumePart: "ส่วนที่",
@@ -106,6 +111,11 @@
       reminderOld: "{n} file(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they are exported.",
       resume: "Resume",
       pause: "Pause",
+      rename: "Rename",
+      renamePrompt: "Meeting title",
+      renamed: "Renamed",
+      meetingWord: "Meeting",
+      titlePlaceholder: "Optional: named by date and time, rename later",
       unpause: "Continue",
       paused: "Recording paused · tap Continue",
       resumePart: "part",
@@ -204,7 +214,7 @@
       node.textContent = t(key);
     });
     el("languageButton").textContent = state.language === "th" ? "EN" : "TH";
-    el("meetingTitle").placeholder = state.language === "th" ? "เช่น Weekly Risk Review" : "e.g. Weekly Risk Review";
+    el("meetingTitle").placeholder = t("titlePlaceholder");
     if (!state.recorder && !state.resume) setStatus(t("ready"), false);
     if (state.resume) el("resumeButton").textContent = t("resume") + " (" + t("resumePart") + " " + state.resume.part + ")";
     renderRecordings();
@@ -399,10 +409,15 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "delete";
+
+      const rename = document.createElement("button");
+      rename.type = "button";
+      rename.textContent = t("rename");
+      rename.addEventListener("click", () => renameRecord(record.id));
       remove.textContent = t("delete");
       remove.addEventListener("click", () => deleteRecord(record.id));
 
-      actions.append(play, exportButton, remove);
+      actions.append(play, exportButton, rename, remove);
       item.append(name, meta, actions);
       container.append(item);
     }
@@ -513,10 +528,11 @@
       state.pausedTotal = 0;
       state.recordingId = crypto.randomUUID();
 
-      const baseTitle = continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim();
+      const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
+        || t("meetingWord") + " " + formatDate(state.startedAt);
       const part = continuing ? continuing.part : 1;
       const title = part > 1
-        ? (baseTitle || (state.language === "th" ? "การประชุม" : "Meeting")) + " · " + t("resumePart") + " " + part
+        ? baseTitle + " · " + t("resumePart") + " " + part
         : baseTitle;
       const extension = fileExtension(mimeType);
       const fileName = "MIA-" + new Date(state.startedAt).toISOString().replace(/[:.]/g, "-") + "." + extension;
@@ -779,6 +795,21 @@
       await markExported(id);
     } catch (error) {
       if (error?.name !== "AbortError") showWarning(t("noExport") + ": " + (error?.message || ""));
+    }
+  }
+
+  async function renameRecord(id) {
+    try {
+      const record = await getRecord(id);
+      if (!record) return;
+      const answer = window.prompt(t("renamePrompt"), record.title || "");
+      const title = (answer || "").trim().slice(0, 120);
+      if (!title || title === record.title) return;
+      record.title = title;
+      await saveRecording(record);
+      if (!state.recorder) setStatus(t("renamed"), false);
+    } catch (error) {
+      showWarning(error?.message || t("storageFailed"));
     }
   }
 
