@@ -328,26 +328,39 @@
 
     @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
     @media (min-width:600px){main{padding-top:26px}}
+    /* v0.7 minimal */
+    .gear{width:44px;height:44px;border-radius:50%;border:var(--line);background:#fff;color:var(--ink);display:grid;place-items:center;flex:none;position:relative}
+    .gear.dot::after{content:"";position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:var(--coral);border:2px solid #fff}
+    .top{margin:10px 0 18px}.top h1{font-size:30px}
+    .hero{text-align:center;padding:28px 20px 26px;margin-bottom:12px}
+    .hero .status-pill{margin:0 auto}
+    .hero .listening{max-width:none;margin:0 auto 18px}
+    .hero .controls{justify-content:center;max-width:none}
+    .title-block{margin-bottom:6px}
+    .import-link{display:block;margin:0 auto 26px}
+    .plain{margin-bottom:18px}
+    .plain .section-head{margin-bottom:10px}
+    .drop{padding:28px 20px;gap:16px;margin-bottom:26px}
+    .drop h2{font-size:24px}
+    .sheet-body{overflow:auto;padding:16px 14px 18px}
+    .sheet-body .limits{border:var(--line);border-radius:22px;background:#fff;padding:14px 16px;margin:6px 0 14px}
+    .sheet-body .limits h2{font-size:16px}
+    .set-note{font-size:13px;color:var(--muted);margin:0 4px 12px}
+    .set-note strong{color:var(--ink)}
+    .opt-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+    .opt-row .pill-toggle button{min-width:0;min-height:36px;padding:0 12px;font-size:13px}
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
   </style>
 </head>
 <body>
 <main>
  <div class="view-record">
   <header class="top">
-    <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text">
-      <h1>Hello there!</h1>
-      <p data-i18n="tagline">Ready for your next meeting?</p>
-    </div>
-    <span class="pill" aria-label="Audio stays on this device">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      <span data-i18n="onDevice">On-device</span>
-    </span>
+    <div class="top-text"><h1>Record</h1></div>
+    <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
   <section class="hero" aria-label="Recorder">
-    <div class="blob" aria-hidden="true"></div>
-    <div class="blob-eyes" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
     <div class="status-pill" role="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">Ready to record</span></div>
     <div class="timer" id="timer" aria-label="Recorded time">00:00:00</div>
     <span class="listening" id="heroHint">Tap Start when your meeting begins</span>
@@ -368,52 +381,26 @@
   </section>
 
   <div class="title-block">
-    <label class="field-label" for="meetingTitle" data-i18n="meetingTitle">Meeting title</label>
-    <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Optional · auto-named by date">
+    <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" aria-label="Meeting title" placeholder="Meeting title (optional)">
   </div>
 
-  <section class="card import-card">
-    <button class="row-button" id="importButton" type="button">
-      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
-      <span class="row-text"><strong data-i18n="chooseFile">Import a recording</strong><span data-i18n="importCopy">Recorded in Voice Memos or another app? Share → Save to Files, then pick it here. MIA makes the minutes.</span></span>
-      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
-    </button>
-  </section>
 
-  <div class="stats">
+  <button class="link-btn import-link" id="importButton" type="button">Import a recording from Files</button>
+
+  <div class="stats hidden">
     <div class="stat lilac"><b id="statTotal">0</b><span>Recordings</span></div>
     <div class="stat sun"><b id="statUnexported">0</b><span>To export</span></div>
   </div>
 
-  <details class="card limits">
-    <summary><h2 id="limitsTitle">Tips for a complete recording</h2><span class="chev" aria-hidden="true">+</span></summary>
-    <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
-    <ul class="tip-list">
-      <li><span class="tip-icon" style="background:var(--peach)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
-        <div><strong>Keep MIA open on screen</strong><span>Don't press the lock button or switch apps while recording. MIA tries to keep the screen awake.</span></div></li>
-      <li><span class="tip-icon" style="background:var(--lilac)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></span>
-        <div><strong>Turn on Do Not Disturb</strong><span>Also turn off Low Power Mode. If the screen still dims, set Auto-Lock to Never.</span></div></li>
-      <li><span class="tip-icon" style="background:var(--sun)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
-        <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
-      <li><span class="tip-icon" style="background:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
-        <div><strong>Keep a backup</strong><span>iOS can clear browser storage. For an important meeting, tap Export → Save to Files as a backup copy.</span></div></li>
-    </ul>
-  </details>
 
-  <section class="card" aria-labelledby="libraryTitle">
+  <section class="plain" aria-labelledby="libraryTitle">
     <div class="section-head"><h2 id="libraryTitle" data-i18n="library">My recordings</h2><span class="count" id="recordCount">0</span></div>
     <div class="notice" id="reminder" role="status"></div>
     <div class="records" id="records"></div>
   </section>
 
-  <section class="card">
-    <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
-    <div class="row-button">
-      <span class="row-icon sky"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
-      <span class="row-text"><strong data-i18n="onlineTitle">Online meeting?</strong><span data-i18n="onlineCopy">Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.</span></span>
-    </div>
-  </section>
 
+  <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4" hidden>
   <input id="transcriptInput" type="file" accept=".txt,text/plain" hidden>
   <dialog class="sheet" id="transcriptDialog" aria-labelledby="transcriptHeading">
     <div class="sheet-head">
@@ -433,27 +420,16 @@
       <button class="action danger" id="transcriptRemove" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/></svg><span data-i18n="transcriptRemove">Remove</span></button>
     </div>
   </dialog>
-  <footer class="foot">
-    <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
-    <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.6.8</p>
-  </footer>
  </div>
  <div class="view-agent">
   <div id="agentHome">
    <header class="top">
-    <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>MIA Agent</h1><p>Turn any recording into minutes</p></div>
+    <div class="top-text"><h1>Agent</h1></div>
+    <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
    <section class="drop" aria-labelledby="dropTitle">
-    <div class="blob" aria-hidden="true"></div>
-    <div class="drop-face" aria-hidden="true">
-     <span class="eyes"><span class="eye"><i></i></span><span class="eye"><i></i></span></span>
-     <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
-    </div>
-    <h2 id="dropTitle">Feed me a recording</h2>
-    <p>From MIA, Voice Memos or any app. m4a, mp3 or wav. Built for 1-hour meetings, up to 2 hours.</p>
+    <h2 id="dropTitle">Turn a recording into minutes</h2>
     <button class="btn" id="agentPick" type="button">
      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>
      Choose audio file
@@ -462,40 +438,15 @@
    </section>
 
 
-   <section class="lang-row">
-    <span class="lang-text"><strong>Minutes language</strong><span>Meetings are heard as Thai + English</span></span>
-    <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
-    <button type="button" data-out="th" aria-pressed="true">Thai</button>
-    <button type="button" data-out="en" aria-pressed="false">English</button>
-   </div>
-   </section>
 
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="agentTerms"><strong>Names &amp; terms</strong><span>Helps spell people, projects and jargon right</span></label>
-   </section>
-   <input class="terms-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off">
 
-   <section class="svc" id="svcCard">
-    <span class="svc-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 5 14h6l-1 7 8-11h-6Z"/></svg></span>
-    <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
-    <button class="svc-btn" id="svcButton" type="button">Set up · free</button>
-   </section>
 
-   <section class="card" aria-labelledby="jobsTitle">
+   <section class="plain" aria-labelledby="jobsTitle">
     <div class="section-head"><h2 id="jobsTitle">My jobs</h2><span class="count" id="agentJobCount">0</span></div>
     <div class="jobs" id="agentJobs"></div>
    </section>
 
-   <button class="link-btn settings-link hidden" id="svcLink" type="button">Groq settings</button>
 
-   <section class="how" aria-labelledby="howTitle">
-    <h2 id="howTitle">How the Agent works</h2>
-    <ol>
-     <li>Tap Stop in Record, or add a file here (Voice Memos: Share → Save to Files).</li>
-     <li>MIA turns the speech into text in 5-minute parts, so a 1–2 hour meeting is safe.</li>
-     <li>Minutes are written for you automatically. For an important meeting, tap Refine with Claude.</li>
-    </ol>
-   </section>
   </div>
 
   <div id="agentDetail" class="hidden">
@@ -536,14 +487,11 @@
       <button class="link-btn" id="pasteMinutes" type="button">Or paste minutes from Claude</button>
      </div>
      <div id="minutesFilled" class="hidden">
-      <div class="lang-row"><span class="lang-text"><strong>Minutes in</strong></span><div class="pill-toggle" id="jobOut" role="group" aria-label="Minutes language">
-    <button type="button" data-out="th" aria-pressed="true">Thai</button>
-    <button type="button" data-out="en" aria-pressed="false">English</button>
-   </div></div>
-      <div class="lang-row"><span class="lang-text"><strong>Recorded as</strong><span id="kindNote">Auto-detected</span></span><div class="pill-toggle" id="jobKind" role="group" aria-label="Recording type">
-    <button type="button" data-kind="meeting" aria-pressed="true">Meeting</button>
-    <button type="button" data-kind="talk" aria-pressed="false">Talk</button>
-   </div></div>
+      <div class="opt-row">
+       <div class="pill-toggle" id="jobOut" role="group" aria-label="Minutes language"><button type="button" data-out="th" aria-pressed="true">Thai</button><button type="button" data-out="en" aria-pressed="false">English</button></div>
+       <div class="pill-toggle" id="jobKind" role="group" aria-label="Recording type"><button type="button" data-kind="meeting" aria-pressed="true">Meeting</button><button type="button" data-kind="talk" aria-pressed="false">Talk</button></div>
+       <span class="sr-only" id="kindNote"></span>
+      </div>
       <div class="m-stats" id="mStats"><div class="sun"><b id="statDecisions">0</b><span>Decisions</span></div><div class="lilac"><b id="statActions">0</b><span>Actions</span></div><div class="peach"><b id="statRisks">0</b><span>Risks</span></div></div>
       <div class="paper minutes" id="minutesBody"></div>
       <div class="refine">
@@ -562,6 +510,48 @@
    <button class="danger-link" id="deleteJob" type="button">Delete this job</button>
   </div>
  </div>
+  <dialog class="sheet" id="settingsDialog" aria-labelledby="settingsTitle">
+   <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button class="sheet-close" id="settingsClose" type="button">Done</button></div>
+   <div class="sheet-body">
+   <section class="lang-row">
+    <span class="lang-text"><strong>Minutes language</strong><span>Meetings are heard as Thai + English</span></span>
+    <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
+    <button type="button" data-out="th" aria-pressed="true">Thai</button>
+    <button type="button" data-out="en" aria-pressed="false">English</button>
+   </div>
+   </section>
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="agentTerms"><strong>Names &amp; terms</strong><span>Helps spell people, projects and jargon right</span></label>
+   </section>
+   <input class="terms-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off">
+   <section class="svc" id="svcCard">
+    <span class="svc-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 5 14h6l-1 7 8-11h-6Z"/></svg></span>
+    <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
+    <button class="svc-btn" id="svcButton" type="button">Set up · free</button>
+   </section>
+   <button class="link-btn settings-link hidden" id="svcLink" type="button">Change Groq key</button>
+  <details class="limits">
+    <summary><h2 id="limitsTitle">Tips for a complete recording</h2><span class="chev" aria-hidden="true">+</span></summary>
+    <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
+    <ul class="tip-list">
+      <li><span class="tip-icon" style="background:var(--peach)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
+        <div><strong>Keep MIA open on screen</strong><span>Don't press the lock button or switch apps while recording. MIA tries to keep the screen awake.</span></div></li>
+      <li><span class="tip-icon" style="background:var(--lilac)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></span>
+        <div><strong>Turn on Do Not Disturb</strong><span>Also turn off Low Power Mode. If the screen still dims, set Auto-Lock to Never.</span></div></li>
+      <li><span class="tip-icon" style="background:var(--sun)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
+        <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
+      <li><span class="tip-icon" style="background:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
+        <div><strong>Keep a backup</strong><span>iOS can clear browser storage. For an important meeting, tap Export → Save to Files as a backup copy.</span></div></li>
+    </ul>
+  </details>
+   <p class="set-note"><strong>Online meeting?</strong> Place your iPhone near the laptop speaker. MIA records the room sound.</p>
+  <div class="foot">
+    <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
+    <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
+    <p>MIA prototype · v0.7.0</p>
+  </div>
+   </div>
+  </dialog>
 </main>
 <nav class="nav" aria-label="Sections">
   <button type="button" id="navRecord" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Record</button>

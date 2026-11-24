@@ -562,6 +562,7 @@
     $("svcButton").textContent = ok ? "Settings" : "Set up · free";
     $("svcCard").classList.toggle("hidden", ok);   // only shown when setup is needed
     $("svcLink").classList.toggle("hidden", !ok);
+    for (const g of document.querySelectorAll("[data-settings]")) g.classList.toggle("dot", !ok);
     $("keyRemove").classList.toggle("hidden", !ok);
   }
   function openSetup() {
@@ -738,6 +739,8 @@
     $("refineClaude").addEventListener("click", () => act("copySummary"));
     $("svcButton").addEventListener("click", openSetup);
     $("svcLink").addEventListener("click", openSetup);
+    for (const g of document.querySelectorAll("[data-settings]")) g.addEventListener("click", () => $("settingsDialog").showModal());
+    $("settingsClose").addEventListener("click", () => $("settingsDialog").close());
     $("keySave").addEventListener("click", saveKeyFromInput);
     $("keyCancel").addEventListener("click", () => $("groqDialog").close());
     $("keyRemove").addEventListener("click", () => { if (window.confirm("Remove the Groq key from this iPhone?")) { setKey(""); $("groqDialog").close(); render(); } });

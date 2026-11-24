@@ -57,7 +57,7 @@
       renamePrompt: "Meeting title",
       renamed: "Renamed",
       meetingWord: "Meeting",
-      titlePlaceholder: "Optional · auto-named by date",
+      titlePlaceholder: "Meeting title (optional)",
       unpause: "Continue",
       paused: "Paused",
       resumePart: "part",
