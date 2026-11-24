@@ -290,7 +290,14 @@
     .minutes h3{font-family:var(--display);font-weight:600;font-size:17px;margin:16px 0 6px;padding-bottom:4px;border-bottom:2px dashed var(--sand)}
     .minutes h3:first-child{margin-top:0}
     .minutes p,.minutes li{font-weight:600;font-size:15px;line-height:1.6;margin:0 0 6px}
-    .minutes ul{margin:0;padding-left:20px}
+    .minutes ul{margin:0 0 8px;padding-left:20px}
+    .minutes li.num{list-style:none;margin-left:-20px}
+    .minutes h4{font-weight:800;font-size:15px;margin:12px 0 4px}
+    .minutes p.lead{font-size:16px;line-height:1.65;background:var(--cream);border:var(--line);border-radius:16px;padding:12px 14px;margin:0 0 12px}
+    .minutes p{line-height:1.7}
+    .compare-btn{width:100%;margin-bottom:10px;background:var(--lilac);color:var(--ink)}
+    .compare-tabs{display:flex;flex-wrap:wrap;margin:8px 0 12px}
+    .compare-tabs button{min-width:0;font-size:13px}
     .verify{display:inline-block;font-size:11px;font-weight:800;color:#8f2b1c;background:#ffe1da;border-radius:6px;padding:0 6px;vertical-align:1px}
     .table-box{overflow-x:auto;border:var(--line);border-radius:16px;margin:4px 0 8px}
     .minutes table{border-collapse:collapse;width:100%;font-size:14px}
@@ -443,7 +450,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.16.2</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.17.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -517,7 +524,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.16.2</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.17.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -615,6 +622,7 @@
       <div class="export-row"><button class="btn" id="exportWord" type="button">Save as Word</button><button class="btn" id="exportPdf" type="button">Save as PDF</button></div>
       <details class="more-menu">
        <summary>More</summary>
+      <button class="btn compare-btn" id="compareBtn" type="button">Compare brains · free</button>
       <div class="refine">
        <button class="btn" id="refineClaude" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8Z"/></svg>Refine with Claude</button>
        <a class="btn" id="refineGpt" href="https://chatgpt.com/" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8Z"/></svg>Refine with ChatGPT</a>
@@ -633,6 +641,15 @@
    <button class="danger-link" id="deleteJob" type="button">Delete this job</button>
   </div>
  </div>
+  <dialog class="sheet" id="compareDialog" aria-labelledby="compareTitle">
+   <div class="sheet-head"><h2 id="compareTitle">Compare brains</h2><button class="sheet-close" id="compareClose" type="button">Done</button></div>
+   <div class="sheet-body">
+    <p class="row-note">The same recording, written by different free models on your Groq account. Tap a name to read its report, then pick the one you like.</p>
+    <div class="pill-toggle compare-tabs" id="compareTabs" role="group" aria-label="Models"></div>
+    <div class="paper minutes" id="compareBody"></div>
+    <button class="btn go" id="compareUse" type="button">Use this brain</button>
+   </div>
+  </dialog>
   <dialog class="sheet" id="settingsDialog" aria-labelledby="settingsTitle">
    <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button class="sheet-close" id="settingsClose" type="button">Done</button></div>
    <div class="sheet-body">
@@ -720,7 +737,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.16.2</p>
+    <p>MIA prototype · v0.17.0</p>
   </div>
    </div>
   </dialog>
