@@ -110,7 +110,9 @@
     });
     const loc = start.headers.get("Location");
     if (!loc) throw new Error("Google Drive didn't accept the audio upload.");
-    const res = await fetch(loc, { method: "PUT", headers: { "Content-Type": blob.type || "application/octet-stream" }, body: blob });
+    // Fresh in-memory copy: iOS can't always send a Blob read from IndexedDB.
+    const body = new Blob([await blob.arrayBuffer()], { type: blob.type || "application/octet-stream" });
+    const res = await fetch(loc, { method: "PUT", headers: { "Content-Type": blob.type || "application/octet-stream" }, body });
     if (!res.ok) throw new Error("Audio upload failed (" + res.status + ").");
     return (await res.json()).id;
   }
