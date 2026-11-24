@@ -134,6 +134,7 @@
     el("statusDot").classList.toggle("live", recording);
     el("startButton").disabled = recording;
     el("stopButton").disabled = !recording;
+    el("importButton").disabled = recording;
   }
 
   function updateTranslations() {
@@ -227,8 +228,8 @@
           title: (session.title || "MIA") + (state.language === "th" ? " [กู้คืน · อาจไม่สมบูรณ์]" : " [Recovered · possibly incomplete]"),
           fileName: session.fileName,
           origin: "live",
-          createdAt: now,
-          durationSeconds: Math.max(0, (now - session.startedAt) / 1000),
+          createdAt: session.startedAt,
+          durationSeconds: rows.length,
           mimeType: blob.type,
           blob,
           size: blob.size,
@@ -288,6 +289,7 @@
     for (const record of records) {
       const item = document.createElement("div");
       item.className = "record";
+      item.dataset.recordId = record.id;
 
       const name = document.createElement("div");
       name.className = "record-name";
@@ -568,13 +570,15 @@
       const url = URL.createObjectURL(record.blob);
       state.currentObjectUrls.set(id, url);
 
-      const audio = new Audio(url);
+      const recordElement = document.querySelector(`[data-record-id="${CSS.escape(id)}"]`);
+      if (!recordElement) throw new Error("Recording row not found");
+      recordElement.querySelector("audio")?.remove();
+      const audio = document.createElement("audio");
+      audio.controls = true;
       audio.preload = "metadata";
-      audio.addEventListener("ended", () => revokeObjectUrl(id), { once: true });
-      audio.addEventListener("error", () => {
-        revokeObjectUrl(id);
-        showWarning(t("noAudio"));
-      }, { once: true });
+      audio.src = url;
+      audio.addEventListener("error", () => showWarning(t("noAudio")), { once: true });
+      recordElement.append(audio);
       await audio.play();
     } catch (error) {
       showWarning((error?.message || t("noAudio")));
@@ -585,6 +589,13 @@
     try {
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noExport"));
+      if (navigator.share && typeof File === "function") {
+        const shareFile = new File([record.blob], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
+        if (navigator.canShare?.({ files: [shareFile] })) {
+          await navigator.share({ files: [shareFile], title: record.title || "MIA audio" });
+          return;
+        }
+      }
       const url = URL.createObjectURL(record.blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -598,7 +609,7 @@
         // Share is intentionally not invoked automatically; user can use the downloaded file via iOS Share Sheet.
       }
     } catch (error) {
-      showWarning(t("noExport") + ": " + (error?.message || ""));
+      if (error?.name !== "AbortError") showWarning(t("noExport") + ": " + (error?.message || ""));
     }
   }
 
