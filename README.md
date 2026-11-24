@@ -26,9 +26,9 @@ See [iOS build and test instructions](ios/README.md). Open `ios/MIA.xcodeproj` u
 
 ## Free iPhone testing option
 
-A free installable Safari web app (PWA) is available in `web/`. It avoids Apple Developer Program membership and TestFlight. It records on-device through the browser, imports audio, and keeps browser-local audio in IndexedDB. It is not equivalent to a native recorder and does not guarantee background recording.
+A static Safari web app (PWA) prototype is in `web/`. It has no in-app account or audio upload and stores recordings in the current browser on the iPhone. iOS may pause or stop recording in the background or when the screen locks, so complete recordings are not guaranteed. Use non-confidential audio and export important files after each meeting.
 
-See [the PWA deployment and iPhone installation guide](web/README.md). Cloudflare Pages Free can host the static files from this private GitHub repository. Protect the production `*.pages.dev` address with Cloudflare Access before using the app. Use non-confidential audio only; this prototype's browser storage is not application-level encrypted.
+The app needs an HTTPS host before iPhone Safari can use its microphone or install it to the Home Screen. This repository does not have a hosted URL configured. The user of a hosted copy does not need to sign up for an app account; the person arranging hosting may still need a hosting provider account. See [the iPhone workflow and limitations](web/README.md).
 
 ## Repository layout
 - `ios/MIAApp/` — SwiftUI app, recorder service, local file store, app configuration

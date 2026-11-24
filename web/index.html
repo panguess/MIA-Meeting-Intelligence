@@ -28,7 +28,7 @@
     .start{background:var(--danger);border-color:var(--danger);color:#fff}.stop{border-color:#9e4c53;color:#ffb3b7;background:#42272f}
     button:disabled{opacity:.38}
     .notice{border:1px solid #8d7041;background:#46371e66;color:#f2d69e;border-radius:12px;padding:12px;font-size:13px;line-height:1.5;margin-top:12px;display:none}
-    .notice.show{display:block}.copy{color:var(--muted);font-size:13px;line-height:1.55}
+    .notice.show{display:block}.copy{color:var(--muted);font-size:13px;line-height:1.55}.limitation{border-left:3px solid var(--warn);padding-left:11px;color:#f2d69e}
     .row{display:flex;align-items:center;justify-content:space-between;gap:12px}.row h2{font-size:15px;margin:0}.small{font-size:11px;color:var(--muted)}
     .records{display:flex;flex-direction:column;gap:9px;margin-top:13px}.record{border:1px solid var(--line);border-radius:13px;padding:12px;background:#0f1b2a}.record-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}.record-meta{font-size:11px;color:var(--muted);margin-top:5px}.record-actions{display:flex;gap:8px;margin-top:10px}.record-actions button{padding:8px 10px;font-size:12px}.delete{color:#ff9ca2;border-color:#75434a}
     .privacy{font-size:11px;color:var(--muted);line-height:1.6;text-align:center;padding:14px 8px}.hidden{display:none!important}
@@ -50,6 +50,7 @@
   <section class="card">
     <div class="eyebrow" data-i18n="capture">Audio capture · iPhone only</div>
     <div class="status-row"><span class="dot" id="statusDot"></span><div class="status" id="statusText" data-i18n="ready">พร้อมบันทึก</div></div>
+    <p class="copy limitation" data-i18n="foregroundNote">สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้ใน Safari และอย่าล็อกหน้าจอ iOS อาจหยุดหรือพักการบันทึกเมื่อสลับแอปหรือมีสายเข้า จึงไม่รับประกันว่าจะบันทึกครบทั้งการประชุม</p>
     <div class="timer" id="timer">00:00:00</div>
     <label for="meetingTitle" data-i18n="meetingTitle">ชื่อการประชุม</label>
     <input class="field" id="meetingTitle" maxlength="120" placeholder="เช่น Weekly Risk Review">
@@ -77,6 +78,7 @@
     <div class="records" id="records"><p class="copy" data-i18n="empty">ยังไม่มีไฟล์เสียง</p></div>
   </section>
 
+  <div class="privacy" data-i18n="installHint">เพิ่ม MIA ไปยังหน้าจอโฮม: เปิดด้วย Safari → แตะ Share → Add to Home Screen (ต้องใช้ลิงก์ HTTPS)</div>
   <div class="privacy" data-i18n="privacy">MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เป้าหมายเก็บเสียง 90 วัน · ไม่มี Cloud AI หรือการส่งข้อมูลออก</div>
 </main>
 <script src="./app.js" defer></script>
