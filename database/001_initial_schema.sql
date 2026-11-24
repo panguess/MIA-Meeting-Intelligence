@@ -1,66 +1,89 @@
--- MIA initial PostgreSQL schema draft.
--- Review identifiers, retention jobs, indexes, and access policies before production.
-
+-- MIA initial schema draft. Review before production migration.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
+    mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE workspaces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_user_id UUID NOT NULL REFERENCES users(id),
+    name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE meetings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id UUID NOT NULL REFERENCES workspaces(id),
     title TEXT NOT NULL,
-    meeting_language TEXT[] NOT NULL DEFAULT ARRAY['th', 'en'],
-    started_at TIMESTAMPTZ,
-    ended_at TIMESTAMPTZ,
-    status TEXT NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'recording', 'processing', 'review', 'approved', 'failed')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    source_type TEXT NOT NULL CHECK (source_type IN ('live_iphone', 'iphone_import')),
+    status TEXT NOT NULL DEFAULT 'created',
+    meeting_ended_at TIMESTAMPTZ,
+    audio_delete_after TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE audio_assets (
+CREATE TABLE recordings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-    storage_key TEXT NOT NULL UNIQUE,
-    checksum_sha256 TEXT NOT NULL,
+    storage_object_key TEXT NOT NULL,
     media_type TEXT NOT NULL,
-    duration_seconds NUMERIC(12, 3),
-    file_size_bytes BIGINT NOT NULL CHECK (file_size_bytes >= 0),
-    source TEXT NOT NULL CHECK (source IN ('iphone_recording', 'iphone_import')),
-    captured_at TIMESTAMPTZ,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    duration_seconds NUMERIC,
+    sha256 TEXT NOT NULL,
+    imported BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
 );
 
 CREATE TABLE transcript_segments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-    sequence_no INTEGER NOT NULL,
-    speaker_label TEXT,
-    start_ms BIGINT NOT NULL CHECK (start_ms >= 0),
-    end_ms BIGINT NOT NULL CHECK (end_ms >= start_ms),
+    start_ms BIGINT NOT NULL,
+    end_ms BIGINT NOT NULL,
     text TEXT NOT NULL,
-    confidence NUMERIC(5, 4),
-    UNIQUE (meeting_id, sequence_no)
-);
-
-CREATE TABLE meeting_outputs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-    output_type TEXT NOT NULL
-        CHECK (output_type IN ('detailed_minutes', 'executive_summary', 'action_tracker', 'risk_issue_log')),
-    content JSONB NOT NULL,
-    status TEXT NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'pending_approval', 'approved', 'rejected')),
-    approved_at TIMESTAMPTZ,
+    speaker_label TEXT,
+    confidence NUMERIC,
+    source_recording_id UUID REFERENCES recordings(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_meetings_user_created ON meetings(user_id, created_at DESC);
-CREATE INDEX idx_audio_assets_expiry ON audio_assets(expires_at);
-CREATE INDEX idx_transcript_meeting_sequence ON transcript_segments(meeting_id, sequence_no);
-CREATE INDEX idx_outputs_meeting_type ON meeting_outputs(meeting_id, output_type);
+CREATE TABLE meeting_minutes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved')),
+    executive_summary TEXT,
+    body_markdown TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(meeting_id, version)
+);
+
+CREATE TABLE action_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id UUID NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    owner_label TEXT,
+    due_date DATE,
+    status TEXT NOT NULL DEFAULT 'unconfirmed',
+    evidence_segment_ids UUID[] NOT NULL DEFAULT '{}',
+    human_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE audit_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_user_id UUID REFERENCES users(id),
+    event_type TEXT NOT NULL,
+    object_type TEXT,
+    object_id UUID,
+    outcome TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Production requirements not yet encoded here:
+-- row-level security policies, encryption/key management, retention jobs,
+-- risk/decision tables, tenant isolation tests, backup lifecycle, audit immutability.
