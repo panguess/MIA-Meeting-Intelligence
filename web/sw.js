@@ -1,4 +1,4 @@
-const CACHE_NAME = "mia-pwa-v0.1.1";
+const CACHE_NAME = "mia-pwa-v0.1.2";
 const ASSETS = ["./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", event => {
