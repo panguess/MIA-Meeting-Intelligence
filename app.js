@@ -62,6 +62,9 @@
       paused: "Paused",
       resumePart: "part",
       stoppedUnexpectedly: "Recording stopped unexpectedly",
+      autoResuming: "Resuming the recording…",
+      autoResumed: "Recording resumed by itself after a {gap} gap. The part before the gap is saved and being summarised.",
+      autoResumeFailed: "MIA couldn't restart the microphone by itself. Tap Resume to keep recording.",
       resumeHint: "Everything up to now is saved. Tap Resume to record the next part right away.",
       recoveredHint: "MIA recovered an unfinished recording from last time. If the meeting is still going, tap Resume.",
       recoveredSuffix: " (recovered, may be incomplete)",
@@ -137,6 +140,7 @@
     pausedTotal: 0,
     wakeLock: null,
     resume: null,
+    auto: null,
     transcriptTarget: null,
     transcriptOpen: null
   };
@@ -306,6 +310,7 @@
           incomplete: true,
           live: liveTake(session.id)
         });
+        session.endedAt = session.startedAt + rows.length * 1000;
         if (!latest || session.startedAt > latest.startedAt) latest = session;
       }
       await deleteSessionData(session.id);
@@ -314,6 +319,8 @@
     if (latest && Date.now() - latest.startedAt < 6 * 60 * 60 * 1000) {
       offerResume(nextPart(latest), "recoveredHint");
       setStatus(t("stoppedUnexpectedly"), false);
+      const endedAt = latest.endedAt || latest.startedAt;
+      if (Date.now() - endedAt < AUTO_RESUME_MS) scheduleAutoResume(state.resume, endedAt);
     }
   }
 
@@ -493,6 +500,9 @@
       state.wakeLock = lock;
       lock.addEventListener("release", () => {
         if (state.wakeLock === lock) state.wakeLock = null;
+        setTimeout(() => {
+          if (!state.wakeLock && state.recorder && state.recorder.state !== "inactive" && document.visibilityState === "visible") acquireWakeLock();
+        }, 1000);
       });
     } catch {
       showWarning(t("wakeLockUnavailable"));
@@ -505,7 +515,8 @@
     if (lock) lock.release().catch(() => {});
   }
 
-  async function startRecording(resume = null) {
+  async function startRecording(resume = null, gapNote = "") {
+    if (!gapNote) state.auto = null;
     clearWarning();
     const continuing = resume && typeof resume.part === "number" ? resume : null;
     hideResume();
@@ -559,6 +570,7 @@
       state.marks = [];
       updateMarkLabel();
       liveStart(state.recordingId);
+      if (gapNote) { live.lines.push({ at: 0, text: gapNote }); liveSave(); liveRender(); }
 
       const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
         || t("meetingWord") + " " + formatDate(state.startedAt);
@@ -632,7 +644,7 @@
           if (recordingId) await deleteSessionData(recordingId);
           setStatus(t("ready"), false);
           showWarning(t("noAudio"));
-          if (!stoppedByUser && sessionRows) offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1 }, "resumeHint");
+          if (!stoppedByUser && sessionRows) { offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1 }, "resumeHint"); scheduleAutoResume(state.resume, endedAt); }
           return;
         }
 
@@ -667,6 +679,7 @@
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
             offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
+            scheduleAutoResume(state.resume, endedAt);
             // iOS stopped it (call, lock, app switch). Still send this part to the
             // Agent in the background so nothing waits on the user; the Record tab
             // stays open so they can Resume. A resumed part becomes its own job.
@@ -1179,6 +1192,44 @@
     }
   }
 
+  // ---------- Auto-resume after a call, Siri, lock or app switch ----------
+  // iOS stops the microphone during a call (answered or declined) and when the
+  // page is hidden. The part so far is already saved and handed to the Agent.
+  // As soon as MIA is on screen again, it starts the next part by itself, and
+  // the transcript gets a line saying how long the gap was. Only for 20
+  // minutes after the stop, so an old meeting never starts recording again.
+  const AUTO_RESUME_MS = 20 * 60 * 1000;
+  function gapText(ms) {
+    const m = Math.round(ms / 60000);
+    return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " s" : m + " min";
+  }
+  function scheduleAutoResume(resume, since) {
+    if (!resume) return;
+    state.auto = { resume, since: since || Date.now(), tries: 0 };
+    setTimeout(tryAutoResume, 1500);
+  }
+  async function tryAutoResume() {
+    const a = state.auto;
+    if (!a || a.busy || state.recorder || document.visibilityState !== "visible") return;
+    if (Date.now() - a.since > AUTO_RESUME_MS) { state.auto = null; return; }
+    a.busy = true; a.tries++;
+    setStatus(t("autoResuming"), false);
+    const gap = gapText(Date.now() - a.since);
+    await startRecording(a.resume, "(Recording paused for about " + gap + " because of an interruption, e.g. a phone call. Anything said during the gap is missing.)");
+    a.busy = false;
+    if (state.recorder) {
+      state.auto = null;
+      showWarning(t("autoResumed").replace("{gap}", gap));
+    } else if (a.tries < 3) {
+      offerResume(a.resume, "resumeHint");
+      setTimeout(tryAutoResume, 4000);
+    } else {
+      state.auto = null;
+      offerResume(a.resume, "resumeHint");
+      showWarning(t("autoResumeFailed"));
+    }
+  }
+
   function onVisibilityChange() {
     if (document.visibilityState === "hidden" && state.recorder && state.recorder.state === "recording") {
       state.pendingWarning = true;
@@ -1188,6 +1239,7 @@
       if (state.recorder && state.recorder.state !== "inactive" && !state.wakeLock) acquireWakeLock();
       // Keep the flag until finalization so the saved recording is marked for review.
       if (state.pendingWarning) showWarning(t("interruption"));
+      if (state.auto) setTimeout(tryAutoResume, 800);
     }
   }
 
@@ -1249,6 +1301,8 @@
     el("transcriptRemove").addEventListener("click", removeTranscript);
     el("transcriptDialog").addEventListener("close", () => { state.transcriptOpen = null; });
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", () => { if (state.auto) setTimeout(tryAutoResume, 800); });
+    window.addEventListener("focus", () => { if (state.auto) setTimeout(tryAutoResume, 800); });
     window.addEventListener("pagehide", () => {
       if (state.recorder && state.recorder.state === "recording") {
         showWarning(t("interruption"));

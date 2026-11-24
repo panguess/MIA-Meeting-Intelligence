@@ -938,7 +938,7 @@
     // With OpenAI on, the audio is transcribed instead (more accurate); the
     // live text is kept as a fallback.
     if (getOpenAIKey()) return t ? { liveTranscript: t } : {};
-    return t.replace(/\[[\d:]+\]\s*/g, "").trim().length > 40 ? { transcript: t, transcriptComplete: true, source: "live" } : {};
+    return t.replace(/\[[\d:]+\]\s*/g, "").replace(/\(Recording paused for about[^)]*\)/g, "").trim().length > 40 ? { transcript: t, transcriptComplete: true, source: "live" } : {};
   }
 
   // Used by the Agent tab and by the Record tab (after Stop, or "Minutes").
