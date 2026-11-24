@@ -106,14 +106,14 @@
     "Transcript A (Whisper) has [mm:ss] time stamps and keeps English words, but often mishears Thai.",
     "Transcript B (Typhoon) is more accurate for Thai words, but writes English words in Thai letters; it is split by minute.",
     "Write transcript A again line by line, keeping every [mm:ss] time stamp, but correct the Thai wording using B,",
-    "and write English terms in English letters (e.g. B's 'ริสก์' -> 'risk').",
+    "and write English terms in English letters (e.g. B's 'ริสก์' -> 'risk'). Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4', 'สาม เดือน' -> '3 เดือน').",
     "Do not summarise, translate, add or remove content. If the two disagree and you are unsure, prefer B for Thai.",
     "Output only the corrected lines."
   ].join("\n");
   const CLEAN_PROMPT = [
     "You fix a speech-to-text transcript of Thai speech mixed with English words.",
     "Correct words that were clearly misheard, using the context (Thai spelling, English terms, names, numbers).",
-    "Write English terms in English letters when the speaker said an English word.",
+    "Write English terms in English letters when the speaker said an English word. Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4').",
     "Do not summarise, translate, add or remove content. Keep every line and its [mm:ss] time stamp at the start.",
     "If unsure about a word, leave it as it is. Output only the corrected lines."
   ].join("\n");
@@ -165,7 +165,7 @@
     "Start with ONE sentence saying what it is and its main point. Then write the report a skilled professional would produce for that purpose, with clear ## headings you choose.",
     "Lead with the facts: put key numbers, dates, names and amounts in a 2-column table (Item | Detail) when there are several.",
     "Organise by topic, not time. Merge repeated points; when something is later updated or corrected, keep the latest version and note 'updated (mm:ss)'.",
-    "Use tables where items share attributes. End with ## Next steps if anything needs doing.",
+    "Use tables where items share attributes. Add ## Next steps ONLY if the speaker said something must be done; never suggest steps yourself.",
     "Add (mm:ss) source times to key points. Use only facts from the input; write [verify] for anything unclear."
   ].join("\n");
   const FINAL_PROMPT = [
@@ -779,13 +779,17 @@
     "- Include a section only if the recording actually contains material for it. Leave out sections that would be empty or guessed (no 'None' sections, except formal meeting minutes).",
     "- Never invent risks, actions, owners, deadlines, KPIs, advice, coaching or next steps that nobody said. Do not judge the speaker's feelings or performance.",
     "- Match the length to the recording: under 3 minutes of speech → a few sentences and at most 6 bullets; longer recordings → as long as the content needs.",
-    "- If the transcript is too garbled to understand, say so in one line and summarise only what is clear."
+    "- If the transcript is too garbled to understand, say so in one line and summarise only what is clear.",
+    "- For a personal story or casual talk: no Decisions, Actions or Next steps sections unless the speaker clearly stated them as such."
   ].join("\n");
   function finalPrompt(job, kind) {
     const mk = (job.marks || []).map(stamp);
     const marksNote = mk.length ? "\nThe user bookmarked these moments as important while recording: " + mk.join(", ") +
       ". Make sure what was said around each time is covered, and put a ★ before those points." : "";
-    const lang = marksNote + "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (meeting-minutes headings stay in English).";
+    const th = (job.outLang || "th") !== "en";
+    const lang = marksNote + "\nWrite in " + (th ? "Thai" : "English") + ", even if the recording is in another language." +
+      (th ? " ALL headings, table headers and labels must be in Thai too (e.g. ## สรุป, ## รายละเอียดสำคัญ, | รายการ | รายละเอียด |) — except formal meeting minutes, whose section headings stay in English exactly as given." : "") +
+      " Write numbers as digits (e.g. พระราม 4, 3 เดือน). Fix obvious speech-to-text slips in names and places.";
     const talk = "You are an excellent note-taker. Summarise this lecture, class, briefing or presentation from the notes or machine transcript provided " +
       "(Thai with English terms; ignore filler and recognition errors, infer the intended meaning).\n" + TALK_FORMAT +
       "\nWrite headings in the output language. Keep English technical terms in English as spoken (e.g. Cost Behavior, Chapter 14)." +
