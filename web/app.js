@@ -24,7 +24,7 @@
       onlineTitle: "Online meeting?",
       onlineCopy: "Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.",
       chooseFile: "Import an audio file",
-      importCopy: "From the Files app. Stored in MIA, never uploaded.",
+      importCopy: "From the Files app. Saved in MIA on this iPhone.",
       library: "My recordings",
       empty: "No recordings yet",
       emptyHint: "Tap Start recording when your meeting begins.",
@@ -32,7 +32,7 @@
       heroLive: "I'm listening · keep MIA open",
       heroPaused: "Paused · tap Continue to go on",
       heroResume: "Tap Resume to keep going",
-      privacy: "Audio stays on this iPhone. No account, and MIA never uploads anything. A copy you save to OneDrive for a transcript follows your OneDrive settings. MIA never deletes recordings on its own.",
+      privacy: "Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.",
       micDenied: "MIA can't use the microphone. Tap Allow when iPhone asks. If you tapped Don't Allow before, go to Settings → Apps → Safari → Microphone, choose Ask or Allow, then try again.",
       micUnsupported: "This browser can't record audio here. Open MIA in Safari on iPhone (iOS 15 or later).",
       recordingStarted: "Recording",
@@ -438,7 +438,7 @@
       };
       action(t("play"), ICONS.play, "", () => playRecord(record.id));
       action(t("export"), ICONS.share, "export", () => exportRecord(record.id));
-      action(t("transcriptShort"), ICONS.text, record.transcript ? "has-transcript" : "", () => openTranscript(record.id));
+      action(record.transcript ? t("transcriptShort") : "Minutes", ICONS.text, record.transcript ? "has-transcript" : "", () => record.transcript ? openTranscript(record.id) : sendToAgent(record.id));
       action(t("rename"), ICONS.pencil, "", () => renameRecord(record.id));
       action(t("delete"), ICONS.trash, "danger", () => deleteRecord(record.id));
 
@@ -649,6 +649,8 @@
             setStatus(t("saved"), false);
             if (!wasPossiblyInterrupted) clearWarning();
             else showWarning(t("interruption"));
+            // Hand the recording to the Agent: transcript and minutes start by themselves.
+            window.MIAAgent?.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds });
           }
         } catch (error) {
           setStatus(t("ready"), false);
@@ -770,6 +772,16 @@
 
   async function getRecord(id) {
     return dbRequest("readonly", store => store.get(id));
+  }
+
+  async function sendToAgent(id) {
+    try {
+      const record = await getRecord(id);
+      if (!record?.blob) throw new Error(t("noAudio"));
+      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds });
+    } catch (error) {
+      showWarning(error?.message || t("noAudio"));
+    }
   }
 
   async function playRecord(id) {
