@@ -979,6 +979,17 @@
     $("svcLink").classList.toggle("hidden", !ok);
     for (const g of document.querySelectorAll("[data-settings]")) g.classList.toggle("dot", !ok);
     $("keyRemove").classList.toggle("hidden", !ok);
+    renderStatus();
+  }
+  // Settings: one plain status line per service (green = done).
+  function setStatusRow(id, ok, text, need) {
+    const li = $(id); if (!li) return;
+    li.classList.toggle("ok", ok); li.classList.toggle("need", !ok && !!need);
+    li.querySelector(".st-val").textContent = text;
+  }
+  function renderStatus() {
+    setStatusRow("stGroq", !!getKey(), getKey() ? "✓ Connected" : "Set up →", true);
+    setStatusRow("stTy", !!getTyphoonKey(), getTyphoonKey() ? "✓ Connected" : "Not connected", false);
   }
   function openSetup() {
     $("keyInput").value = "";
@@ -1206,7 +1217,7 @@
     $("tySave").addEventListener("click", () => {
       const v = $("tyKey").value.trim();
       try { if (v) localStorage.setItem(TYPHOON_KEY, v); else localStorage.removeItem(TYPHOON_KEY); } catch {}
-      $("tyKey").value = ""; tyState(); refreshModels(true);
+      $("tyKey").value = ""; tyState(); renderStatus(); refreshModels(true);
       toast(v ? "Typhoon connected. New recordings use both engines." : "Typhoon turned off");
     });
     try { $("agentTerms").value = localStorage.getItem("mia-terms") || ""; } catch {}
@@ -1272,6 +1283,7 @@
     $("workGo").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
     $("writeMinutes").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
     $("refineClaude").addEventListener("click", () => act("copySummary"));
+    $("stGroq").addEventListener("click", () => { if (!getKey()) openSetup(); });
     // ChatGPT: copy, then the link opens the ChatGPT app (or chatgpt.com).
     $("refineGpt").addEventListener("click", () => {
       const job = state.jobs.find(j => j.id === state.openId);
