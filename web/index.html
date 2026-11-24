@@ -363,6 +363,14 @@
     <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Optional · auto-named by date">
   </div>
 
+  <section class="card import-card">
+    <button class="row-button" id="importButton" type="button">
+      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
+      <span class="row-text"><strong data-i18n="chooseFile">Import a recording</strong><span data-i18n="importCopy">Recorded in Voice Memos or another app? Share → Save to Files, then pick it here. MIA makes the minutes.</span></span>
+      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
+    </button>
+  </section>
+
   <div class="stats">
     <div class="stat lilac"><b id="statTotal">0</b><span>Recordings</span></div>
     <div class="stat sun"><b id="statUnexported">0</b><span>To export</span></div>
@@ -391,12 +399,6 @@
 
   <section class="card">
     <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
-    <button class="row-button" id="importButton" type="button">
-      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
-      <span class="row-text"><strong data-i18n="chooseFile">Import an audio file</strong><span data-i18n="importCopy">From the Files app. Saved in MIA on this iPhone.</span></span>
-      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
-    </button>
-    <div class="divider"></div>
     <div class="row-button">
       <span class="row-icon sky"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
       <span class="row-text"><strong data-i18n="onlineTitle">Online meeting?</strong><span data-i18n="onlineCopy">Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.</span></span>
@@ -425,7 +427,7 @@
   <footer class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.6.5</p>
+    <p>MIA prototype · v0.6.6</p>
   </footer>
  </div>
  <div class="view-agent">

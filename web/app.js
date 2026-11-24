@@ -23,8 +23,8 @@
       stop: "Stop & save",
       onlineTitle: "Online meeting?",
       onlineCopy: "Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.",
-      chooseFile: "Import an audio file",
-      importCopy: "From the Files app. Saved in MIA on this iPhone.",
+      chooseFile: "Import a recording",
+      importCopy: "Recorded in Voice Memos or another app? Share → Save to Files, then pick it here. MIA makes the minutes.",
       library: "My recordings",
       empty: "No recordings yet",
       emptyHint: "Tap Start recording when your meeting begins.",
@@ -772,6 +772,8 @@
         size: blob.size
       });
       setStatus(t("imported"), false);
+      // Straight to the Agent: transcript and minutes start by themselves.
+      await window.MIAAgent?.addAudio(blob, file.name.replace(/\.[a-z0-9]+$/i, ""), { recordId: id });
     } catch (error) {
       showWarning(t("importFailed") + ": " + (error?.message || ""));
     }
