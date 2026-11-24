@@ -562,6 +562,7 @@
     showView("agent");
     render();
     if (!existing && TRANSCRIBER.ready) processJob(job);
+    else if (!existing && opts.recordId) openSetup();  // after Stop with no key yet: show setup right away
     return job;
   }
 

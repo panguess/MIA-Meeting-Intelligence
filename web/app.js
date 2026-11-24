@@ -1060,8 +1060,20 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js").catch(() => {
-        // App remains functional online even if offline caching is unavailable.
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register("./sw.js")
+        .then(reg => reg.update().catch(() => {}))
+        .catch(() => {
+          // App remains functional online even if offline caching is unavailable.
+        });
+      // When a new version takes over, reload once so the user sees it now,
+      // not on the next launch. Never reload in the middle of a recording.
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController || reloaded) return;
+        const reload = () => { if (!reloaded && !state.recorder) { reloaded = true; location.reload(); } };
+        if (!state.recorder) reload();
+        else document.addEventListener("visibilitychange", reload);
       });
     }
   }
