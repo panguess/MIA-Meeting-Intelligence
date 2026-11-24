@@ -1101,8 +1101,16 @@
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
       const hadController = !!navigator.serviceWorker.controller;
+      // Shows whether this copy could reach the update server, so the user knows
+      // when a "new version" can't arrive (laptop off or not on the hotspot).
+      const setLink = ok => document.querySelectorAll(".ver").forEach(v => {
+        v.dataset.base = v.dataset.base || v.textContent;
+        v.textContent = v.dataset.base + (ok ? "" : " · offline copy");
+      });
+      const check = reg => reg.update().then(() => setLink(true), () => setLink(false));
+      window.MIACheckUpdate = () => navigator.serviceWorker.getRegistration().then(reg => reg ? check(reg) : setLink(false));
       navigator.serviceWorker.register("./sw.js")
-        .then(reg => reg.update().catch(() => {}))
+        .then(check)
         .catch(() => {
           // App remains functional online even if offline caching is unavailable.
         });
