@@ -386,6 +386,8 @@
     .live-label i{width:8px;height:8px;border-radius:50%;background:var(--coral)}
     #liveText{margin:4px 0 0;font-size:15px;font-weight:700;line-height:1.5;max-height:4.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
     .improve{display:block;margin:4px auto 12px}
+    .seek{border:0;background:var(--cream);border-radius:8px;padding:0 6px;margin-left:4px;font:inherit;font-size:12px;font-weight:800;color:var(--muted);text-decoration:underline}
+    .line.seek-hit{background:var(--lilac);border-radius:10px;transition:background .3s}
   </style>
 </head>
 <body>
@@ -393,7 +395,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.12.1</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.13.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -467,7 +469,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.12.1</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.13.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -621,7 +623,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.12.1</p>
+    <p>MIA prototype · v0.13.0</p>
   </div>
    </div>
   </dialog>

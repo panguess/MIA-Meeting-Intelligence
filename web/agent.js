@@ -70,14 +70,20 @@
     "Write at most 15 short, specific bullets in the transcript's language. Start each with the topic in brackets, e.g. [Budget].",
     "Prefix bullets: DECISION:, ACTION: (task, owner, due date if said), RISK: (with impact if said), ISSUE:, or none for key points.",
     "Keep names, numbers, amounts and dates exactly as said; note who said it when clear. Mark anything unclear with [verify].",
+    "End each bullet with the [mm:ss] time of the transcript line it comes from, written as (mm:ss).",
     "No introduction, no closing line."
   ].join("\n");
+  // Lectures, classes, briefings, presentations: no fixed template. Like a
+  // good note-taker, pick the structure that fits and lead with the facts.
   const TALK_FORMAT = [
-    "## Overview  (2-3 sentences: topic, speaker if known, purpose)",
-    "## Key points  (bullets, in the order presented)",
-    "## Details  (### one sub-heading per topic, bullets under each)",
-    "## Q&A  (bullets: question → answer; write - None if none)",
-    "## Takeaways  (3-5 bullets)"
+    "Start with ONE sentence saying what this recording is and its main point (e.g. who is speaking, about what, for whom).",
+    "Then a short heading that names the content (e.g. the exam, the project, the policy).",
+    "If there are key numbers, dates, scores, amounts, deadlines or scope: put them first in a 2-column Markdown table (Item | Detail).",
+    "Then numbered sections with headings that fit the content (## 1. ..., ## 2. ...), each with specific bullets.",
+    "Use a Markdown table whenever items share attributes (e.g. chapter | topic | what to focus on).",
+    "If the speaker gave instructions, tips, warnings or things to prepare, end with ## What to do next (bullets).",
+    "If there was Q&A, add ## Q&A (question → answer).",
+    "Where the input gives times, end each numbered section heading and key bullets with the source time as (mm:ss), so the reader can check the recording."
   ].join("\n");
   const FINAL_PROMPT = [
     "You are an experienced corporate secretary writing formal meeting minutes for the risk management team of a large Thai company.",
@@ -92,6 +98,7 @@
     "Style: formal business language (Thai: ภาษาทางการ, concise), keep English business terms in English (e.g. KPI, audit, risk appetite).",
     "Be specific: keep names, numbers, amounts and dates. Merge duplicates. No generic filler.",
     "Before writing, check that every decision, action and risk in the input appears in the minutes.",
+    "Where the input gives times, end key points, decisions and risks with the source time as (mm:ss), so the reader can check the recording.",
     "Use only facts from the input. If a name, number or date is unclear or missing, write [verify].",
     "Output only the Markdown. No introduction."
   ].join("\n");
@@ -224,7 +231,9 @@
   function renderMinutes(md) {
     const out = [];
     let table = null, list = null;
-    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[verify\]/gi, '<span class="verify">verify</span>');
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[verify\]/gi, '<span class="verify">verify</span>')
+      // (mm:ss) source times jump to that moment in the transcript.
+      .replace(/\((\d{1,2}:\d{2}(?::\d{2})?)\)/g, '<button class="seek" type="button" data-seek="$1">$1</button>');
     const flush = () => {
       if (list) { out.push("<ul>" + list.join("") + "</ul>"); list = null; }
       if (table) {
@@ -561,9 +570,12 @@
     const mk = (job.marks || []).map(stamp);
     const marksNote = mk.length ? "\nThe user bookmarked these moments as important while recording: " + mk.join(", ") +
       ". Make sure what was said around each time is covered, and put a ★ before those points." : "";
-    const lang = marksNote + "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (headings stay in English).";
-    const talk = "You write a clear summary of a presentation or lecture, from the notes or transcript provided.\nKeep the section headings below in English, exactly:\n" + TALK_FORMAT +
-      "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown. No introduction.";
+    const lang = marksNote + "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (meeting-minutes headings stay in English).";
+    const talk = "You are an excellent note-taker. Summarise this lecture, class, briefing or presentation from the notes or machine transcript provided " +
+      "(Thai with English terms; ignore filler and recognition errors, infer the intended meaning).\n" + TALK_FORMAT +
+      "\nWrite headings in the output language. Keep English technical terms in English as spoken (e.g. Cost Behavior, Chapter 14)." +
+      "\nBe specific and complete: keep every number, name, date and instruction. No generic filler." +
+      "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown.";
     if (job.kind === "meeting") return "TYPE: meeting\n" + FINAL_PROMPT + lang;
     if (job.kind === "talk") return talk + lang;
     return "First decide what was recorded: a MEETING (several people discussing, deciding, assigning work) or a TALK (one main speaker presenting, teaching or lecturing).\n" +
@@ -940,6 +952,17 @@
     const openJob = () => state.jobs.find(j => j.id === state.openId && j.minutes);
     $("exportWord").addEventListener("click", () => { const j = openJob(); if (j) exportWord(j); });
     $("exportPdf").addEventListener("click", () => { const j = openJob(); if (j) exportPdf(j); });
+    // Tap a (mm:ss) in the minutes: show that moment in the transcript.
+    $("minutesBody").addEventListener("click", e => {
+      const b = e.target.closest("[data-seek]");
+      if (!b) return;
+      state.tab = "transcript"; $("transcriptSearch").value = ""; renderDetail();
+      const want = secOf(b.dataset.seek);
+      const lines = [...$("transcriptBody").querySelectorAll(".line")];
+      let best = null;
+      for (const l of lines) { const st = l.querySelector(".stamp"); if (st && secOf(st.textContent.replace("★", "")) <= want) best = l; }
+      if (best) { best.classList.add("seek-hit"); best.scrollIntoView({ block: "center", behavior: "smooth" }); setTimeout(() => best.classList.remove("seek-hit"), 2500); }
+    });
     $("trackerOpen").addEventListener("click", () => { state.tracker = true; render(); window.scrollTo({ top: 0 }); });
     $("trackerBack").addEventListener("click", () => { state.tracker = false; render(); });
     $("trackerSeg").addEventListener("click", e => { const b = e.target.closest("button[data-kind]"); if (b) { state.trackerKind = b.dataset.kind; renderTracker(); } });
