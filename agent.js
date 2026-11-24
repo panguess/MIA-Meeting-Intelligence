@@ -662,6 +662,9 @@
           const start = i * size, end = Math.min(audio.length, start + size);
           const mono = new Float32Array(end - start);
           for (const ch of chans) for (let j = 0; j < mono.length; j++) mono[j] += ch[start + j] / chans.length;
+          // Quiet recordings: lift the level so the ears hear soft speech better.
+          let peak = 0; for (let j = 0; j < mono.length; j++) { const a = Math.abs(mono[j]); if (a > peak) peak = a; }
+          if (peak > 0.001 && peak < 0.5) { const g = Math.min(10, 0.9 / peak); for (let j = 0; j < mono.length; j++) mono[j] *= g; }
           return { blob: wav(mono, rate), offset: i * PART_SECONDS, samples: mono, rate };
         }
       };
