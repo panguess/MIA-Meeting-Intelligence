@@ -11,9 +11,11 @@
 
   const MINUTES_PROMPT = [
     "Summarise this recording (Thai with English terms; machine transcript with [mm:ss] times, so ignore filler and recognition errors).",
-    "First decide what it is: a MEETING, or a lecture/class/briefing/presentation.",
+    "First decide what it is: a MEETING, a lecture/class/briefing/presentation, FIELD NOTES, or something else.",
     "Meeting: write formal minutes with ## Overview, ## Key points (grouped by agenda topic), ## Decisions, ## Action items (table: Task | Owner | Due date), ## Open issues, ## Risks raised (risk → impact → mitigation).",
     "Lecture or presentation: one sentence on what it is, a table of key facts (numbers, dates, scores, scope), then numbered sections by topic, tables where items share attributes, and ## What to do next.",
+    "Field notes (one person dictating observations on site, e.g. a stock count): an observation report with ## Summary, ## Key facts (table), ## Findings by area, ## Issues & risks (table), ## Follow-ups (table). Merge repeats into one entry per area/item; latest info wins, noted 'updated (mm:ss)'.",
+    "Anything else: infer the best report structure for its purpose.",
     "Organise by TOPIC, not time order: if a topic comes back later, put it under that topic and keep both times. If something is later corrected or contradicted, keep the final version and note 'later clarified (mm:ss)'.",
     "Add (mm:ss) source times to key points. Write in the transcript's language; keep English terms in English. Use only facts from the transcript; write [verify] for anything unclear.",
     "",
@@ -28,8 +30,59 @@
   // written in small steps: short notes per part, then one final pass.
   // The API key is kept only in this browser (localStorage).
   const GROQ = "https://api.groq.com/openai/v1";
-  const STT_MODEL = "whisper-large-v3";
-  const LLM_MODEL = "openai/gpt-oss-120b";
+  // ---------- Models: keep up with new free models automatically ----------
+  // The ONE place to update preferences. Each provider's model list is read
+  // once a day; the first rule that matches an available model wins, and
+  // within a rule the newest-looking id (highest version) wins. If nothing
+  // matches or the list can't be read, the safe default is used.
+  const MODEL_PREFS = {
+    groqStt: { def: "whisper-large-v3", rules: [/^whisper-large-v\d+$/i, /^whisper-large/i] },
+    groqLlm: { def: "openai/gpt-oss-120b", rules: [/^openai\/gpt-oss.*-120b$/i, /^openai\/gpt-oss/i] },
+    typhoon: { def: "typhoon-asr-realtime", rules: [/^typhoon.*asr(?!.*realtime)/i, /^typhoon.*asr/i] },
+    openai: { def: "gpt-transcribe", rules: [/^gpt-transcribe$/i, /^gpt-[\w.]*transcribe$/i, /^gpt-4o-transcribe$/i] }
+  };
+  // Size tags like -120b or -20b are not versions, so they are ignored.
+  const verKey = id => (id.replace(/\d+(?:\.\d+)?b\b/gi, "").match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  const newer = (a, b) => { const x = verKey(a), y = verKey(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); } return b.localeCompare(a); };
+  function pickModel(kind, ids) {
+    const pref = MODEL_PREFS[kind];
+    for (const rule of pref.rules) {
+      const hits = ids.filter(id => rule.test(id)).sort(newer);
+      if (hits.length) return hits[0];
+    }
+    return pref.def;
+  }
+  const models = (() => { try { return JSON.parse(localStorage.getItem("mia-models") || "{}"); } catch { return {}; } })();
+  const useModel = kind => models[kind] || MODEL_PREFS[kind].def;
+  function dropModel(kind) { delete models[kind]; try { localStorage.setItem("mia-models", JSON.stringify(models)); } catch {} renderModels(); }
+  async function listIds(url, key) {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const res = await fetch(url, { headers: { Authorization: "Bearer " + key }, signal: ctl.signal });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.data || []).map(m => m.id).filter(Boolean);
+    } catch { return null; } finally { clearTimeout(t); }
+  }
+  async function refreshModels(force) {
+    if (!force && models.at && Date.now() - models.at < 24 * 3600 * 1000) return;
+    const tasks = [];
+    if (getKey()) tasks.push(listIds(GROQ + "/models", getKey()).then(ids => { if (ids) { models.groqStt = pickModel("groqStt", ids); models.groqLlm = pickModel("groqLlm", ids); } }));
+    if (getTyphoonKey()) tasks.push(listIds(TYPHOON + "/models", getTyphoonKey()).then(ids => { if (ids && ids.length) models.typhoon = pickModel("typhoon", ids); }));
+    if (getOpenAIKey()) tasks.push(listIds(OPENAI + "/models", getOpenAIKey()).then(ids => { if (ids && ids.length) models.openai = pickModel("openai", ids); }));
+    await Promise.all(tasks);
+    models.at = Date.now();
+    try { localStorage.setItem("mia-models", JSON.stringify(models)); } catch {}
+    renderModels();
+  }
+  function renderModels() {
+    const el = document.getElementById("modelNote");
+    if (!el) return;
+    const parts = ["Speech: " + useModel("groqStt"), "Minutes: " + useModel("groqLlm")];
+    if (getTyphoonKey()) parts.push("Typhoon: " + useModel("typhoon"));
+    if (getOpenAIKey()) parts.push("OpenAI: " + useModel("openai"));
+    el.textContent = "Models in use (updated automatically): " + parts.join(" · ");
+  }
   const PART_SECONDS = 300;
   const DIRECT_UPLOAD_MAX = 24 * 1024 * 1024;
   const KEY_NAME = "mia-groq-key";
@@ -63,7 +116,7 @@
   const PART_PROMPT = [
     "You take notes from one part of a transcript of a meeting, presentation or lecture (Thai and/or English).",
     "The transcript is machine speech-to-text: ignore filler words and obvious recognition errors, infer the intended word from context.",
-    "Write at most 15 short, specific bullets in the transcript's language. Start each with the topic in brackets, e.g. [Budget].",
+    "Write at most 15 short, specific bullets in the transcript's language. Start each with the topic, area or item in brackets, e.g. [Budget] or [Warehouse B / SKU 1234].",
     "Prefix bullets: DECISION:, ACTION: (task, owner, due date if said), RISK: (with impact if said), ISSUE:, or none for key points.",
     "Keep names, numbers, amounts and dates exactly as said; note who said it when clear. Mark anything unclear with [verify].",
     "End each bullet with the [mm:ss] time of the transcript line it comes from, written as (mm:ss).",
@@ -82,6 +135,34 @@
     "If the speaker gave instructions, tips, warnings or things to prepare, end with ## What to do next (bullets).",
     "If there was Q&A, add ## Q&A (question → answer).",
     "Where the input gives times, end each numbered section heading and key bullets with the source time as (mm:ss), so the reader can check the recording."
+  ].join("\n");
+  // Field notes: one person dictating observations over time (stock count,
+  // site visit, audit walk-through). It is a living report, not a timeline:
+  // a repeated point updates the earlier item and the latest info wins.
+  const FIELD_PROMPT = [
+    "You are an experienced internal auditor / risk officer turning one person's spoken field notes into an observation report.",
+    "The input is a machine transcript of the observer dictating while on site (Thai with English terms): ignore filler and recognition errors, infer the intended meaning.",
+    "This is NOT a timeline. The observer often comes back to an item to add or correct information. Merge everything said about the same area, item, location or person into ONE entry.",
+    "When later information updates or contradicts earlier information, keep ONLY the latest version in the entry and add 'updated (mm:ss)'. Never list the same item twice.",
+    "Structure:",
+    "Start with ONE sentence: what was observed, where, when and by whom (only what was said).",
+    "## Summary (3-5 bullets: the overall result and the most important findings)",
+    "## Key facts (2-column Markdown table Item | Detail: counts, quantities, differences, amounts, dates, locations, people present)",
+    "## Findings by area (one ### sub-heading per area/item/location/process; bullets: what was observed, what was expected if said, the gap; (mm:ss) on each bullet)",
+    "## Issues & risks (Markdown table: Issue | Risk / impact | Severity High/Medium/Low (your judgement, mark [verify] if unsure))",
+    "## Follow-ups (Markdown table: Action | Owner | Due date; '-' if not said)",
+    "## Open questions (things still to confirm)",
+    "Write 'None' under a heading only if there is truly nothing. Keep every number, name and date exactly; write [verify] when unclear."
+  ].join("\n");
+  // Anything else: no template. Infer the best report for the purpose.
+  const SMART_PROMPT = [
+    "You are an excellent analyst. The input is a machine transcript of a recording (Thai with English terms): ignore filler and recognition errors, infer the intended meaning.",
+    "Work out what this recording is and what the listener needs from it (e.g. an interview, a phone call, a site visit, a brainstorm, a voice memo, a training).",
+    "Start with ONE sentence saying what it is and its main point. Then write the report a skilled professional would produce for that purpose, with clear ## headings you choose.",
+    "Lead with the facts: put key numbers, dates, names and amounts in a 2-column table (Item | Detail) when there are several.",
+    "Organise by topic, not time. Merge repeated points; when something is later updated or corrected, keep the latest version and note 'updated (mm:ss)'.",
+    "Use tables where items share attributes. End with ## Next steps if anything needs doing.",
+    "Add (mm:ss) source times to key points. Use only facts from the input; write [verify] for anything unclear."
   ].join("\n");
   const FINAL_PROMPT = [
     "You are an experienced corporate secretary writing formal meeting minutes for the risk management team of a large Thai company.",
@@ -403,7 +484,7 @@
         const kind = job.detectedKind || (job.kind && job.kind !== "auto" ? job.kind : "meeting");
         for (const x of $("jobKind").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.kind === kind));
         $("kindNote").textContent = job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected";
-        $("mStats").classList.toggle("hidden", kind === "talk");
+        $("mStats").classList.toggle("hidden", kind !== "meeting");
         $("improveBtn").classList.toggle("hidden", job.source !== "live" || !job.audio);
         const out = job.outLang || (job.lang === "en" ? "en" : "th");
         for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
@@ -450,7 +531,20 @@
       return groq(path, body, attempt + 1);
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data.error && data.error.message) || "Groq error " + res.status);
+    if (!res.ok) {
+      const msg = (data.error && data.error.message) || "";
+      // A model picked from the list was retired: go back to the safe default once.
+      if ((res.status === 400 || res.status === 404) && /model/i.test(msg)) {
+        const kind = body instanceof FormData ? "groqStt" : "groqLlm";
+        const cur = body instanceof FormData ? body.get("model") : body.model;
+        if (cur && cur !== MODEL_PREFS[kind].def) {
+          dropModel(kind);
+          if (body instanceof FormData) body.set("model", MODEL_PREFS[kind].def); else body.model = MODEL_PREFS[kind].def;
+          return groq(path, body, attempt);
+        }
+      }
+      throw new Error(msg || "Groq error " + res.status);
+    }
     return data;
   }
 
@@ -511,7 +605,8 @@
   async function typhoonFile(blob, attempt = 0) {
     const form = new FormData();
     form.append("file", blob, "part.wav");
-    form.append("model", "typhoon-asr-realtime");
+    const tyModel = useModel("typhoon");
+    form.append("model", tyModel);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 90000);
     let res;
@@ -520,6 +615,7 @@
     } finally { clearTimeout(timer); }
     if ((res.status === 429 || res.status >= 500) && attempt < 3) { await sleep(5000 * (attempt + 1)); return typhoonFile(blob, attempt + 1); }
     const data = await res.json().catch(() => ({}));
+    if (!res.ok && tyModel !== MODEL_PREFS.typhoon.def && (res.status === 400 || res.status === 404)) { dropModel("typhoon"); return typhoonFile(blob, attempt); }
     if (!res.ok) throw new Error("Typhoon " + res.status);
     return (data.text || "").trim();
   }
@@ -539,11 +635,10 @@
   const OPENAI = "https://api.openai.com/v1";
   const OPENAI_KEY = "mia-openai-key";
   const getOpenAIKey = () => { try { return localStorage.getItem(OPENAI_KEY) || ""; } catch { return ""; } };
-  let openaiModel = "gpt-transcribe";
   async function openaiFile(blob, attempt = 0) {
     const form = new FormData();
     form.append("file", blob, "part.wav");
-    const model = openaiModel;
+    const model = useModel("openai");
     form.append("model", model);
     form.append("language", "th");
     const terms = getTerms();
@@ -556,7 +651,11 @@
     } finally { clearTimeout(timer); }
     const data = await res.json().catch(() => ({}));
     const msg = (data.error && data.error.message) || "";
-    if (!res.ok && model === "gpt-transcribe" && /model/i.test(msg) && (res.status === 400 || res.status === 404)) { openaiModel = "gpt-4o-transcribe"; return openaiFile(blob, attempt); }
+    if (!res.ok && /model/i.test(msg) && (res.status === 400 || res.status === 404) && model !== "gpt-4o-transcribe") {
+      models.openai = model === MODEL_PREFS.openai.def ? "gpt-4o-transcribe" : MODEL_PREFS.openai.def;
+      try { localStorage.setItem("mia-models", JSON.stringify(models)); } catch {}
+      return openaiFile(blob, attempt);
+    }
     if ((res.status === 429 || res.status >= 500) && attempt < 4) { await sleep(4000 * (attempt + 1)); return openaiFile(blob, attempt + 1); }
     if (res.status === 401) throw new Error("OpenAI didn't accept the key");
     if (!res.ok) throw new Error(msg || "OpenAI " + res.status);
@@ -583,7 +682,7 @@
   async function transcribePart(blob, offset, lang, name) {
     const form = new FormData();
     form.append("file", blob, (name || "part") + (blob.type === "audio/wav" ? ".wav" : ".m4a"));
-    form.append("model", STT_MODEL);
+    form.append("model", useModel("groqStt"));
     form.append("response_format", "verbose_json");
     form.append("temperature", "0");
     // Meetings are Thai with English terms mixed in. Fixing the language to
@@ -600,7 +699,7 @@
 
   async function chat(system, user, maxTokens, effort) {
     const data = await groq("/chat/completions", {
-      model: LLM_MODEL,
+      model: useModel("groqLlm"),
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       temperature: 0.2,
       max_completion_tokens: maxTokens,
@@ -622,13 +721,22 @@
       "\nWrite headings in the output language. Keep English technical terms in English as spoken (e.g. Cost Behavior, Chapter 14)." +
       "\nBe specific and complete: keep every number, name, date and instruction. No generic filler." +
       "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown.";
+    const tail = "\nWrite headings in the output language. Keep English terms in English as spoken.\nOutput only the Markdown.";
+    const field = FIELD_PROMPT + tail, smart = SMART_PROMPT + tail;
     if (job.kind === "meeting") return "TYPE: meeting\n" + FINAL_PROMPT + lang;
     if (job.kind === "talk") return talk + lang;
-    return "First decide what was recorded: a MEETING (several people discussing, deciding, assigning work) or a TALK (one main speaker presenting, teaching or lecturing).\n" +
-      "Write the first line exactly as TYPE: meeting or TYPE: talk.\n\nIf meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + lang;
+    if (job.kind === "field") return field + lang;
+    if (job.kind === "other") return smart + lang;
+    return "First decide what was recorded:\n" +
+      "- MEETING: several people discussing, deciding, assigning work.\n" +
+      "- TALK: one main speaker presenting, teaching, lecturing or briefing an audience.\n" +
+      "- FIELD: one person dictating their own observations or notes while on site (e.g. a stock count, store visit, inspection, audit walk-through), often coming back to earlier points.\n" +
+      "- OTHER: anything else (interview, phone call, brainstorm, voice memo, ...).\n" +
+      "Write the first line exactly as TYPE: meeting, TYPE: talk, TYPE: field or TYPE: other. Then follow the matching instructions.\n\n" +
+      "If meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + "\n\nIf field:\n" + field + "\n\nIf other:\n" + smart + lang;
   }
   function takeType(job, text) {
-    const m = text.match(/^\s*TYPE:\s*(meeting|talk)\s*\n/i);
+    const m = text.match(/^\s*\**TYPE:\s*(meeting|talk|field|other)\**\s*\n/i);
     if (m) { job.detectedKind = m[1].toLowerCase(); return text.slice(m[0].length).trim(); }
     if (job.kind !== "auto" && job.kind) job.detectedKind = job.kind;
     return text;
@@ -810,6 +918,7 @@
     $("groqDialog").close();
     renderService(); render();
     toast("Groq connected");
+    refreshModels(true);
     const waiting = state.jobs.find(j => j.id === state.openId && !j.minutes);
     if (waiting) processJob(waiting);
   }
@@ -940,6 +1049,7 @@
   }
 
   async function init() {
+    renderModels(); refreshModels();
     $("navRecord").addEventListener("click", () => showView("record"));
     $("navAgent").addEventListener("click", () => showView("agent"));
     $("agentPick").addEventListener("click", () => $("agentFile").click());
@@ -986,7 +1096,7 @@
     $("oaSave").addEventListener("click", () => {
       const v = $("oaKey").value.trim();
       try { if (v) localStorage.setItem(OPENAI_KEY, v); else localStorage.removeItem(OPENAI_KEY); } catch {}
-      $("oaKey").value = ""; oaState();
+      $("oaKey").value = ""; oaState(); refreshModels(true);
       toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
     });
     const tyState = () => { $("tyState").textContent = getTyphoonKey() ? "On" : "Off"; };
@@ -994,7 +1104,7 @@
     $("tySave").addEventListener("click", () => {
       const v = $("tyKey").value.trim();
       try { if (v) localStorage.setItem(TYPHOON_KEY, v); else localStorage.removeItem(TYPHOON_KEY); } catch {}
-      $("tyKey").value = ""; tyState();
+      $("tyKey").value = ""; tyState(); refreshModels(true);
       toast(v ? "Typhoon connected. New recordings use both engines." : "Typhoon turned off");
     });
     try { $("agentTerms").value = localStorage.getItem("mia-terms") || ""; } catch {}
