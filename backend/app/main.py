@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="MIA API", version="0.1.0")
-
+app = FastAPI(title="MIA Private API", version="0.1.0")
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "mia-api"}
+def health():
+    # Deliberately returns no environment, host, or secret information.
+    return {"status": "ok", "service": "mia-api", "version": "0.1.0"}
