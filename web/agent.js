@@ -557,7 +557,7 @@
         $("minutesBody").innerHTML = renderMinutes(job.minutes);
         const kind = job.detectedKind || (job.kind && job.kind !== "auto" ? job.kind : "meeting");
         for (const x of $("jobKind").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.kind === kind));
-        $("kindNote").textContent = job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected";
+        $("kindNote").textContent = (job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected") + (job.engine ? " · Heard by " + earsName(job.engine) : "");
         $("mStats").classList.toggle("hidden", kind !== "meeting");
         $("improveBtn").classList.toggle("hidden", job.source !== "live" || !job.audio);
         $("improveNote").classList.toggle("hidden", job.source !== "live" || !job.audio);
@@ -925,6 +925,8 @@
     const res = {};
     let shown = list[0];
     const draw = () => {
+      $("compareTitle").textContent = "Compare brains";
+      $("compareNote").textContent = "The same recording, written by different free models on your Groq account. Tap a name to read its report, then pick the one you like.";
       $("compareTabs").innerHTML = list.map(m => '<button type="button" data-model="' + esc(m) + '" aria-pressed="' + (m === shown) + '">' + esc(brainName(m)) + (m === reportModel() ? " · current" : "") + "</button>").join("");
       const r = res[shown];
       $("compareBody").innerHTML = r == null ? '<p class="row-note">Writing with ' + esc(brainName(shown)) + "…</p>" : r.error ? '<p class="row-note">Failed: ' + esc(r.error) + "</p>" : renderMinutes(r.text);
@@ -950,6 +952,48 @@
       if (d.open) draw();
     }
   }
+
+  // Same audio, heard again by OpenAI (paid): side by side with the free ears.
+  async function compareEars(job) {
+    if (!job.audio) return toast("This job has no audio to re-listen to.");
+    if (!getOpenAIKey()) return toast("Add an OpenAI key first: ⚙ Settings → Advanced.");
+    const min = Math.max(1, Math.round((job.duration || 0) / 60));
+    if (!window.confirm("OpenAI will listen to this recording again. Cost: " + (min < 6 ? "less than 1 THB" : "about " + Math.round(min / 6) + " THB") + " (" + min + " min of audio, paid to OpenAI). Continue?")) return;
+    const d = $("compareDialog");
+    const res = { free: { text: job.transcript || "" }, openai: null };
+    let shown = "openai";
+    const body = t => '<div class="ears-text">' + esc(t).replace(/\n/g, "<br>") + "</div>";
+    const draw = () => {
+      $("compareTitle").textContent = "Compare ears";
+      $("compareNote").textContent = "The same audio. Free = what MIA heard (" + earsName(job.engine) + "). OpenAI = heard again by OpenAI. Tap to switch and check the words you know.";
+      $("compareTabs").innerHTML = [["free", "Free (now)"], ["openai", "OpenAI"]].map(([k, n]) => '<button type="button" data-model="' + k + '" aria-pressed="' + (k === shown) + '">' + n + "</button>").join("");
+      const r = res[shown];
+      $("compareBody").innerHTML = r == null ? '<p class="row-note">OpenAI is listening… about 1 minute per 10 minutes of audio.</p>' : r.error ? '<p class="row-note">Failed: ' + esc(r.error) + "</p>" : body(r.text);
+      $("compareUse").disabled = !(res.openai && res.openai.text) || shown !== "openai";
+      $("compareUse").textContent = "Use OpenAI's transcript and rewrite the report";
+    };
+    $("compareTabs").onclick = e => { const b = e.target.closest("[data-model]"); if (b) { shown = b.dataset.model; draw(); } };
+    $("compareUse").onclick = async () => {
+      if (!res.openai || !res.openai.text) return;
+      job.transcriptFree = job.transcriptFree || job.transcript;
+      if (job.minutes && !job.minutesMia) job.minutesMia = job.minutes;
+      job.transcript = res.openai.text; job.engine = "openai"; job.transcriptComplete = true;
+      job.minutes = ""; job.status = "queued"; job.progress = 0; job.reportFrom = 80;
+      await saveJob(job); d.close(); state.tab = "minutes"; render();
+      processJob(job);
+    };
+    draw();
+    if (!d.open) d.showModal();
+    try {
+      const sp = await splitAudio(job.audio);
+      const parts = [];
+      for (let i = 0; i < sp.count; i++) parts.push(await openaiPart(sp.part(i)));
+      res.openai = { text: parts.filter(Boolean).join("\n") || "(OpenAI heard nothing)" };
+      diag("Compare ears: OpenAI heard " + res.openai.text.length + " characters, free " + res.free.text.length);
+    } catch (e) { res.openai = { error: why(e, "OpenAI") }; }
+    if (d.open) draw();
+  }
+  const earsName = e => ({ openai: "OpenAI", "typhoon+whisper": "Whisper + Typhoon", whisper: "Whisper only" })[e] || "unknown";
 
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
@@ -1586,6 +1630,7 @@
     $("workGo").addEventListener("click", go);
     $("writeMinutes").addEventListener("click", go);
     $("refineClaude").addEventListener("click", () => act("copySummary"));
+    $("compareEars").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) compareEars(j).catch(e => toast(e.message)); });
     $("compareBtn").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) compareBrains(j).catch(e => toast(e.message)); });
     $("compareClose").addEventListener("click", () => $("compareDialog").close());
     $("stGroq").addEventListener("click", () => { if (!getKey()) openSetup(); });
