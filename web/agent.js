@@ -42,18 +42,33 @@
 
   const getKey = () => { try { return localStorage.getItem(KEY_NAME) || ""; } catch { return ""; } };
   const setKey = k => { try { k ? localStorage.setItem(KEY_NAME, k) : localStorage.removeItem(KEY_NAME); } catch {} };
+  const getTerms = () => { try { return (localStorage.getItem("mia-terms") || "").trim(); } catch { return ""; } };
   const TRANSCRIBER = { get ready() { return !!getKey(); }, name: "Groq" };
 
+  const CLEAN_PROMPT = [
+    "You fix a speech-to-text transcript of Thai speech mixed with English words.",
+    "Correct words that were clearly misheard, using the context (Thai spelling, English terms, names, numbers).",
+    "Write English terms in English letters when the speaker said an English word.",
+    "Do not summarise, translate, add or remove content. Keep every line and its [mm:ss] time stamp at the start.",
+    "If unsure about a word, leave it as it is. Output only the corrected lines."
+  ].join("\n");
   const PART_PROMPT = [
-    "You take notes from one part of a meeting transcript (Thai and/or English).",
+    "You take notes from one part of a transcript of a meeting, presentation or lecture (Thai and/or English).",
     "Write at most 12 short bullets in the transcript's language.",
     "Prefix bullets: DECISION:, ACTION: (with owner and due date if said), RISK:, ISSUE:, or none for key points.",
     "Keep names, numbers and dates exactly as said. Mark anything unclear with [verify].",
     "No introduction, no closing line."
   ].join("\n");
+  const TALK_FORMAT = [
+    "## Overview  (2-3 sentences: topic, speaker if known, purpose)",
+    "## Key points  (bullets, in the order presented)",
+    "## Details  (### one sub-heading per topic, bullets under each)",
+    "## Q&A  (bullets: question → answer; write - None if none)",
+    "## Takeaways  (3-5 bullets)"
+  ].join("\n");
   const FINAL_PROMPT = [
     "You write meeting minutes for a risk management team, from the notes or transcript provided.",
-    "Write in the meeting's language (usually Thai). Keep the section headings below in English, exactly:",
+    "Keep the section headings below in English, exactly:",
     "## Overview  (2-3 sentences)",
     "## Key points  (bullets)",
     "## Decisions  (bullets; write - None if none)",
@@ -295,6 +310,10 @@
         $("statActions").textContent = st.actions;
         $("statRisks").textContent = st.risks;
         $("minutesBody").innerHTML = renderMinutes(job.minutes);
+        const kind = job.detectedKind || (job.kind && job.kind !== "auto" ? job.kind : "meeting");
+        for (const x of $("jobKind").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.kind === kind));
+        $("kindNote").textContent = job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected";
+        $("mStats").classList.toggle("hidden", kind === "talk");
         const out = job.outLang || (job.lang === "en" ? "en" : "th");
         for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
       }
@@ -397,7 +416,8 @@
     // Thai stops Whisper from guessing English (and translating), and the
     // prompt nudges it to keep English words in English spelling.
     form.append("language", "th");
-    form.append("prompt", "การประชุมภาษาไทยที่มีคำภาษาอังกฤษปน เช่น risk, action item, deadline, KPI, audit, compliance, vendor, budget");
+    const terms = getTerms();
+    form.append("prompt", ("ภาษาไทยที่มีคำภาษาอังกฤษปน เช่น risk, action item, deadline, KPI, audit, compliance" + (terms ? ", " + terms : "")).slice(0, 400));
     const data = await groq("/audio/transcriptions", form);
     const segs = Array.isArray(data.segments) ? data.segments : [];
     if (!segs.length) return (data.text || "").trim() ? "[" + stamp(offset) + "] " + data.text.trim() : "";
@@ -416,10 +436,28 @@
   }
 
   // Shrinks notes until they fit one request, then writes the minutes.
+  // Meeting -> minutes format; presentation or lecture -> talk summary.
+  // "auto" lets the model decide and report it on the first line.
+  function finalPrompt(job) {
+    const lang = "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (headings stay in English).";
+    const talk = "You write a clear summary of a presentation or lecture, from the notes or transcript provided.\nKeep the section headings below in English, exactly:\n" + TALK_FORMAT +
+      "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown. No introduction.";
+    if (job.kind === "meeting") return "TYPE: meeting\n" + FINAL_PROMPT + lang;
+    if (job.kind === "talk") return talk + lang;
+    return "First decide what was recorded: a MEETING (several people discussing, deciding, assigning work) or a TALK (one main speaker presenting, teaching or lecturing).\n" +
+      "Write the first line exactly as TYPE: meeting or TYPE: talk.\n\nIf meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + lang;
+  }
+  function takeType(job, text) {
+    const m = text.match(/^\s*TYPE:\s*(meeting|talk)\s*\n/i);
+    if (m) { job.detectedKind = m[1].toLowerCase(); return text.slice(m[0].length).trim(); }
+    if (job.kind !== "auto" && job.kind) job.detectedKind = job.kind;
+    return text;
+  }
+
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
-    const prompt = FINAL_PROMPT + "\nWrite the minutes in " + ((job.outLang || (job.lang === "en" ? "en" : "th")) === "en" ? "English" : "Thai") + ", even if the meeting was in another language (headings stay in English).";
-    if (transcript.length <= ONE_SHOT_CHARS) return chat(prompt, "Transcript:\n" + transcript, 2500);
+    const prompt = finalPrompt(job);
+    if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 2500));
     let notes = job.parts.map((p, i) => "Part " + (i + 1) + " (from " + stamp(i * PART_SECONDS) + "):\n" + (p.notes || ""));
     while (notes.join("\n\n").length > NOTES_BATCH_CHARS && notes.length > 1) {
       const groups = [];
@@ -430,10 +468,10 @@
       }
       if (cur.length) groups.push(cur);
       const merged = [];
-      for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes, keep every decision, action and risk:\n\n" + g.join("\n\n"), 900));
+      for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes, keep every decision, action, risk and key point:\n\n" + g.join("\n\n"), 900));
       notes = merged;
     }
-    return chat(prompt, "Meeting notes, in order:\n\n" + notes.join("\n\n"), 2500);
+    return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 2500));
   }
 
   let running = null;
@@ -470,7 +508,19 @@
         job.parts[i] = job.parts[i] || {};
         if (job.parts[i].text == null) {
           const p = split.part(i);
-          job.parts[i].text = await transcribePart(p.blob, p.offset, job.lang, p.name);
+          const raw = await transcribePart(p.blob, p.offset, job.lang, p.name);
+          job.parts[i].raw = raw;
+          job.parts[i].text = raw;
+          // Second pass: fix misheard words from context. Kept only if it keeps
+          // the time stamps and roughly the same length; otherwise use raw.
+          if (raw.trim()) {
+            try {
+              const terms = getTerms();
+              const fixed = await chat(CLEAN_PROMPT + (terms ? "\nNames and terms that may appear: " + terms : ""), raw, 3000);
+              const stamps = t => (t.match(/^\[\d/gm) || []).length;
+              if (fixed && stamps(fixed) >= stamps(raw) * 0.8 && fixed.length > raw.length * 0.6 && fixed.length < raw.length * 1.6) job.parts[i].text = fixed;
+            } catch (e) { if (e instanceof KeyError) throw e; }
+          }
           stepsDone++;
           job.heard = stamp(Math.min(job.duration || Infinity, (i + 1) * PART_SECONDS));
           const lines = job.parts[i].text.split("\n");
@@ -653,6 +703,20 @@
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
     syncLangs();
+    // Meeting or talk: overrides auto-detection and rewrites only the summary.
+    $("jobKind").addEventListener("click", async e => {
+      const b = e.target.closest("button[data-kind]");
+      const job = state.jobs.find(j => j.id === state.openId);
+      if (!b || !job || job.status === "working") return;
+      if ((job.detectedKind || job.kind) === b.dataset.kind) return;
+      job.kind = b.dataset.kind; job.detectedKind = b.dataset.kind;
+      job.minutes = "";
+      await saveJob(job);
+      render();
+      if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
+    });
+    try { $("agentTerms").value = localStorage.getItem("mia-terms") || ""; } catch {}
+    $("agentTerms").addEventListener("change", e => { try { localStorage.setItem("mia-terms", e.target.value.trim()); } catch {} });
     $("agentJobs").addEventListener("click", e => {
       const b = e.target.closest("[data-job]");
       if (!b) return;

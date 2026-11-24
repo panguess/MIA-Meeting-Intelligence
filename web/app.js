@@ -522,9 +522,12 @@
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          // No echo cancelling or noise removal: they can clip quiet speech.
+          // Auto gain on: lifts a speaker who is far from the iPhone.
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
+          autoGainControl: true,
+          channelCount: 1
         }
       });
 
@@ -571,7 +574,7 @@
       }), SESSION_STORE);
       state.userStopped = false;
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128000 });
       state.recorder = recorder;
 
       recorder.addEventListener("dataavailable", event => {
