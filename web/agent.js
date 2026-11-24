@@ -64,10 +64,8 @@
     "Output only the Markdown. No introduction."
   ].join("\n");
 
-  const LANG_NAME = { th: "Thai", mix: "Thai + English", en: "English" };
-  const savedLang = (() => { try { return localStorage.getItem("mia-lang"); } catch { return null; } })();
   const savedOut = (() => { try { return localStorage.getItem("mia-out-lang"); } catch { return null; } })();
-  const state = { jobs: [], openId: null, tab: "transcript", lang: LANG_NAME[savedLang] ? savedLang : "th", out: savedOut === "en" ? "en" : "th", db: null };
+  const state = { jobs: [], openId: null, tab: "transcript", lang: "mix", out: savedOut === "en" ? "en" : "th", db: null };
   const $ = id => document.getElementById(id);
 
   // ---------- storage ----------
@@ -226,12 +224,9 @@
     const s = statusOf(job);
     $("detailPill").textContent = s.label;
     $("detailPill").className = "detail-pill " + s.tone;
-    $("detailMeta").textContent = [fmtDate(job.createdAt), fmtDur(job.duration), LANG_NAME[job.lang] || "Thai"].filter(Boolean).join(" · ");
+    $("detailMeta").textContent = [fmtDate(job.createdAt), fmtDur(job.duration), "Thai + English"].filter(Boolean).join(" · ");
 
     const done = !!job.transcript && (job.transcriptComplete || job.status === "done");
-    const canSwitch = job.status !== "working" && !(job.parts && job.parts.length);
-    $("jobLangWrap").classList.toggle("hidden", !canSwitch);
-    for (const x of $("jobLangs").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.lang === job.lang));
     $("detailWorking").classList.toggle("hidden", done);
     $("detailTabs").classList.toggle("hidden", !done);
     $("detailResult").classList.toggle("hidden", !done);
@@ -258,7 +253,7 @@
       const step = job.stage === "minutes" ? 4 : (job.parts && job.parts.length) || working ? 2 : 1;
       $("workSteps").innerHTML = [
         ["Audio received", fmtDur(job.duration) || "Saved on this iPhone"],
-        ["Transcribing", "In 5-minute parts, " + (job.lang === "en" ? "English" : "Thai")],
+        ["Transcribing", "In 5-minute parts, Thai + English"],
         ["Transcript ready", "Search, copy or share"],
         ["Meeting minutes", "Written automatically"]
       ].map((st, i) => {
@@ -398,7 +393,11 @@
     form.append("model", STT_MODEL);
     form.append("response_format", "verbose_json");
     form.append("temperature", "0");
-    if (lang !== "mix") form.append("language", lang === "en" ? "en" : "th");
+    // Meetings are Thai with English terms mixed in. Fixing the language to
+    // Thai stops Whisper from guessing English (and translating), and the
+    // prompt nudges it to keep English words in English spelling.
+    form.append("language", "th");
+    form.append("prompt", "การประชุมภาษาไทยที่มีคำภาษาอังกฤษปน เช่น risk, action item, deadline, KPI, audit, compliance, vendor, budget");
     const data = await groq("/audio/transcriptions", form);
     const segs = Array.isArray(data.segments) ? data.segments : [];
     if (!segs.length) return (data.text || "").trim() ? "[" + stamp(offset) + "] " + data.text.trim() : "";
@@ -627,20 +626,10 @@
     $("navAgent").addEventListener("click", () => showView("agent"));
     $("agentPick").addEventListener("click", () => $("agentFile").click());
     $("agentFile").addEventListener("change", e => { addFile(e.target.files[0]); e.target.value = ""; });
-    // Language: default for new jobs (remembered), shown in Record and Agent;
-    // a job that hasn't started can also be switched on its own page.
+    // Minutes language (Thai or English), remembered for new meetings.
     const syncLangs = () => {
       for (const x of $("agentOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === state.out));
-      for (const id of ["agentLangs"]) for (const x of $(id).querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.lang === state.lang));
     };
-    const pickDefault = e => {
-      const b = e.target.closest("button[data-lang]");
-      if (!b) return;
-      state.lang = b.dataset.lang;
-      try { localStorage.setItem("mia-lang", state.lang); } catch {}
-      syncLangs();
-    };
-    $("agentLangs").addEventListener("click", pickDefault);
     $("agentOut").addEventListener("click", e => {
       const b = e.target.closest("button[data-out]");
       if (!b) return;
@@ -662,17 +651,6 @@
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
     syncLangs();
-    $("jobLangs").addEventListener("click", async e => {
-      const b = e.target.closest("button[data-lang]");
-      const job = state.jobs.find(j => j.id === state.openId);
-      if (!b || !job || job.status === "working") return;
-      if (job.lang !== b.dataset.lang) {
-        job.lang = b.dataset.lang;
-        job.parts = []; job.transcript = ""; job.transcriptComplete = false; job.minutes = ""; job.progress = 0; job.status = "queued";
-        await saveJob(job);
-      }
-      render();
-    });
     $("agentJobs").addEventListener("click", e => {
       const b = e.target.closest("[data-job]");
       if (!b) return;
