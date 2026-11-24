@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://api.groq.com https://api.opentyphoon.ai; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self' https://api.groq.com https://api.opentyphoon.ai https://api.openai.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#fff6ec">
   <meta name="color-scheme" content="light">
@@ -395,7 +395,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.13.1</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.14.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -469,7 +469,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.13.1</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.14.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -598,6 +598,12 @@
     <label class="lang-text" for="agentTerms"><strong>Names &amp; terms</strong><span>Helps spell people, projects and jargon right</span></label>
    </section>
    <input class="terms-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off">
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="oaKey"><strong>OpenAI key · best accuracy</strong><span>Optional · paid, about 10 THB per hour of audio · <b id="oaState">Off</b></span></label>
+   </section>
+   <div class="ty-row"><input id="oaKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste OpenAI key (sk-…)"><button id="oaSave" type="button">Save</button></div>
+   <p class="set-note">Leave empty to stay free. Save an empty field to turn it off.</p>
+
    <section class="svc" id="svcCard">
     <span class="svc-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 5 14h6l-1 7 8-11h-6Z"/></svg></span>
     <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
@@ -623,7 +629,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.13.1</p>
+    <p>MIA prototype · v0.14.0</p>
   </div>
    </div>
   </dialog>

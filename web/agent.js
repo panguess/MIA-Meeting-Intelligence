@@ -534,6 +534,52 @@
     return out.join("\n");
   }
 
+  // ---------- OpenAI transcription (optional, paid, off by default) ----------
+  // Best Thai+English accuracy. Only used when the user saves an OpenAI key.
+  const OPENAI = "https://api.openai.com/v1";
+  const OPENAI_KEY = "mia-openai-key";
+  const getOpenAIKey = () => { try { return localStorage.getItem(OPENAI_KEY) || ""; } catch { return ""; } };
+  let openaiModel = "gpt-transcribe";
+  async function openaiFile(blob, attempt = 0) {
+    const form = new FormData();
+    form.append("file", blob, "part.wav");
+    const model = openaiModel;
+    form.append("model", model);
+    form.append("language", "th");
+    const terms = getTerms();
+    form.append("prompt", ("Thai speech with English business terms kept in English, e.g. risk, KPI, audit, compliance, deadline" + (terms ? ", " + terms : "")).slice(0, 400));
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 120000);
+    let res;
+    try {
+      res = await fetch(OPENAI + "/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + getOpenAIKey() }, body: form, signal: ctl.signal });
+    } finally { clearTimeout(timer); }
+    const data = await res.json().catch(() => ({}));
+    const msg = (data.error && data.error.message) || "";
+    if (!res.ok && model === "gpt-transcribe" && /model/i.test(msg) && (res.status === 400 || res.status === 404)) { openaiModel = "gpt-4o-transcribe"; return openaiFile(blob, attempt); }
+    if ((res.status === 429 || res.status >= 500) && attempt < 4) { await sleep(4000 * (attempt + 1)); return openaiFile(blob, attempt + 1); }
+    if (res.status === 401) throw new Error("OpenAI didn't accept the key");
+    if (!res.ok) throw new Error(msg || "OpenAI " + res.status);
+    return (data.text || "").trim();
+  }
+  // 30-second pieces, 4 at a time: fine time stamps and fast on long meetings.
+  async function openaiPart(p) {
+    if (!p.samples) throw new Error("needs decoded audio");
+    const step = 30 * p.rate, jobs = [];
+    for (let s = 0, k = 0; s < p.samples.length; s += step, k++) jobs.push({ k, s });
+    const out = new Array(jobs.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < jobs.length) {
+        const j = jobs[next++];
+        const text = await openaiFile(wav(p.samples.subarray(j.s, Math.min(p.samples.length, j.s + step)), p.rate));
+        out[j.k] = text ? "[" + stamp(p.offset + j.k * 30) + "] " + text : "";
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    return out.filter(Boolean).join("\n");
+  }
+
   async function transcribePart(blob, offset, lang, name) {
     const form = new FormData();
     form.append("file", blob, (name || "part") + (blob.type === "audio/wav" ? ".wav" : ".m4a"));
@@ -636,7 +682,7 @@
     }
     if (!getKey()) return openSetup();
     running = job.id;
-    job.status = "working"; job.error = "";
+    job.status = "working"; job.error = ""; job.oaWarned = false; job.tyWarned = false;
     await saveJob(job); render();
     const t0 = Date.now();
     let stepsDone = 0;
@@ -665,6 +711,15 @@
         job.parts[i] = job.parts[i] || {};
         if (job.parts[i].text == null) {
           const p = split.part(i);
+          // OpenAI first if the user turned it on; Groq Whisper (+Typhoon) otherwise
+          // or if OpenAI fails.
+          let best = "";
+          if (getOpenAIKey() && !job.oaWarned) {
+            best = await openaiPart(p).catch(e => { if (!job.oaWarned) { job.oaWarned = true; toast("OpenAI didn't answer (" + (e && e.message || "error") + "). Using the free engines."); } return ""; });
+          }
+          if (best) {
+            job.parts[i].raw = best; job.parts[i].text = best; job.engine = "openai";
+          } else {
           // Whisper (Groq) and, if connected, Typhoon listen to the same part.
           const [raw, thai] = await Promise.all([
             transcribePart(p.blob, p.offset, job.lang, p.name),
@@ -686,6 +741,7 @@
               const stamps = t => (t.match(/^\[\d/gm) || []).length;
               if (fixed && stamps(fixed) >= stamps(raw) * 0.8 && fixed.length > raw.length * 0.6 && fixed.length < raw.length * 1.6) job.parts[i].text = fixed;
             } catch (e) { if (e instanceof KeyError) throw e; }
+          }
           }
           stepsDone++;
           job.heard = stamp(Math.min(job.duration || Infinity, (i + 1) * PART_SECONDS));
@@ -770,6 +826,9 @@
   // Live text from the phone: the minutes can be written straight away.
   function liveFields(opts) {
     const t = opts.live || "";
+    // With OpenAI on, the audio is transcribed instead (more accurate); the
+    // live text is kept as a fallback.
+    if (getOpenAIKey()) return t ? { liveTranscript: t } : {};
     return t.replace(/\[[\d:]+\]\s*/g, "").trim().length > 40 ? { transcript: t, transcriptComplete: true, source: "live" } : {};
   }
 
@@ -922,6 +981,14 @@
       render();
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
+    const oaState = () => { $("oaState").textContent = getOpenAIKey() ? "On" : "Off"; };
+    oaState();
+    $("oaSave").addEventListener("click", () => {
+      const v = $("oaKey").value.trim();
+      try { if (v) localStorage.setItem(OPENAI_KEY, v); else localStorage.removeItem(OPENAI_KEY); } catch {}
+      $("oaKey").value = ""; oaState();
+      toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
+    });
     const tyState = () => { $("tyState").textContent = getTyphoonKey() ? "On" : "Off"; };
     tyState();
     $("tySave").addEventListener("click", () => {
@@ -1017,7 +1084,7 @@
   }
 
   // Small hook for tests and screenshots.
-  window.MIAAgent = { typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
+  window.MIAAgent = { openaiKey: getOpenAIKey, typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
