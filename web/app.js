@@ -630,7 +630,7 @@
       state.pendingWarning = true;
       showWarning(t("interruption"));
     } else if (document.visibilityState === "visible" && state.pendingWarning) {
-      state.pendingWarning = false;
+      // Keep the flag until finalization so the saved recording is marked for review.
       showWarning(t("interruption"));
     }
   }
