@@ -1,58 +1,46 @@
 import AVFoundation
 import Foundation
 
-/// Initial prototype only. Must be tested on-device and hardened before production use.
+/// Prototype boundary for iPhone-only acoustic capture.
+/// Production implementation still needs interruption recovery, durable chunk writes,
+/// background capability configuration, storage limits, and device testing.
 final class AudioCaptureService: NSObject {
-    private let audioEngine = AVAudioEngine()
-    private var audioFile: AVAudioFile?
-    private let fileURL: URL
+    private let session = AVAudioSession.sharedInstance()
+    private var recorder: AVAudioRecorder?
 
-    init(fileURL: URL) {
-        self.fileURL = fileURL
-        super.init()
-    }
-
-    func requestPermission() async throws {
-        let granted = await AVAudioApplication.requestRecordPermission()
-        guard granted else {
-            throw AudioCaptureError.permissionDenied
-        }
-    }
-
-    func start() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-        try session.setActive(true)
-
-        let input = audioEngine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw AudioCaptureError.invalidAudioFormat
-        }
-
-        audioFile = try AVAudioFile(forWriting: fileURL, settings: format.settings)
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
-            guard let self, let file = self.audioFile else { return }
-            do {
-                try file.write(from: buffer)
-            } catch {
-                // Production implementation must persist an error state and notify the user.
+    func requestPermission() async -> Bool {
+        await withCheckedContinuation { continuation in
+            session.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
             }
         }
-
-        audioEngine.prepare()
-        try audioEngine.start()
     }
 
-    func stop() {
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
-        audioFile = nil
-        try? AVAudioSession.sharedInstance().setActive(false)
+    func configureSession() throws {
+        try session.setCategory(.record, mode: .default, options: [])
+        try session.setActive(true)
     }
-}
 
-enum AudioCaptureError: Error {
-    case permissionDenied
-    case invalidAudioFormat
+    func startRecording(to url: URL) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        let newRecorder = try AVAudioRecorder(url: url, settings: settings)
+        newRecorder.isMeteringEnabled = true
+        newRecorder.prepareToRecord()
+        guard newRecorder.record() else {
+            throw NSError(domain: "MIA.AudioCapture", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Unable to start recording"])
+        }
+        recorder = newRecorder
+    }
+
+    func stopRecording() {
+        recorder?.stop()
+        recorder = nil
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+    }
 }
