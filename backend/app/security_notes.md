@@ -1,12 +1,12 @@
-# Backend Security Notes
+# Backend security implementation gates
 
-This is a scaffold, not a production security implementation.
-
-- Use private networking and deny-by-default outbound egress.
-- Enforce TLS in transit and encryption at rest.
-- Apply MFA, least privilege, and managed secrets.
-- Do not place audio, transcripts, tokens, or personal data in logs, analytics, or crash reports.
-- Use private object storage; never public buckets or public object URLs.
-- Keep Cloud AI disabled by default; require explicit meeting-level approval and vendor security review.
-- Define deletion across primary storage, replicas, caches, temporary files, and backups. Document backup expiry.
-- Add authentication, authorization, audit trails, rate limits, upload validation, malware scanning, and key rotation before production.
+- Enforce MFA at the identity layer before production.
+- Use TLS end-to-end; reject insecure transport.
+- Keep storage private; no public buckets or permanent public URLs.
+- Use short-lived, meeting-scoped upload credentials.
+- Validate content type by inspecting file bytes, not filename alone.
+- Do not log transcript text, audio bytes, prompts, API keys, or signed URLs.
+- Deny outbound AI-provider traffic by default at network level.
+- Store secrets in a managed secret store, never in source control or mobile app.
+- Add rate limits, request size limits, authorization checks, and audit events.
+- Threat-model and test every export, delete, and recovery path.
