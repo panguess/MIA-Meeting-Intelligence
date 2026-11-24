@@ -1,0 +1,24 @@
+name: Transcriber checks
+
+on:
+  push:
+    paths:
+      - "tools/transcriber/**"
+      - ".github/workflows/transcriber-check.yml"
+  pull_request:
+    paths:
+      - "tools/transcriber/**"
+      - ".github/workflows/transcriber-check.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests (fake transcriber, no model download)
+        working-directory: tools/transcriber
+        run: python -m unittest -v test_mia_transcriber.py

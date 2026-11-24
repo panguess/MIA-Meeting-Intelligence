@@ -1,0 +1,5 @@
+# faster-whisper by SYSTRAN (MIT licence): https://github.com/SYSTRAN/faster-whisper
+# It pulls in CTranslate2 (OpenNMT), PyAV (FFmpeg bindings), onnxruntime
+# (Microsoft, for voice-activity detection) and huggingface-hub (to download the
+# model once). Pinned so the same reviewed version is installed every time.
+faster-whisper==1.2.1

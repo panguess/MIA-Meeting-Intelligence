@@ -32,7 +32,7 @@
       heroLive: "I'm listening · keep MIA open",
       heroPaused: "Paused · tap Continue to go on",
       heroResume: "Tap Resume to keep going",
-      privacy: "Audio stays on this iPhone. No account, no cloud, no uploads. MIA reminds you about files older than 90 days but never deletes them on its own.",
+      privacy: "Audio stays on this iPhone. No account, and MIA never uploads anything. A copy you save to OneDrive for a transcript follows your OneDrive settings. MIA never deletes recordings on its own.",
       micDenied: "MIA can't use the microphone. Tap Allow when iPhone asks. If you tapped Don't Allow before, go to Settings → Apps → Safari → Microphone, choose Ask or Allow, then try again.",
       micUnsupported: "This browser can't record audio here. Open MIA in Safari on iPhone (iOS 15 or later).",
       recordingStarted: "Recording",
@@ -78,6 +78,28 @@
       noAudio: "No audio was found in this file.",
       noExport: "Couldn't export the recording",
       installHint: "Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.",
+      transcript: "Transcript",
+      transcriptShort: "Text",
+      transcriptBadge: "Transcript added",
+      transcriptTitle: "Get a transcript",
+      transcriptCopy: "Export → Save to Files → OneDrive › Desktop › MIA › Inbox. Your laptop writes the transcript back to that folder, then tap Text on the recording to add it.",
+      transcriptAdded: "Transcript added",
+      transcriptRemoved: "Transcript removed",
+      transcriptTooLarge: "This file is too large to be a transcript.",
+      transcriptNotText: "Choose the .transcript.txt file that your laptop made.",
+      transcriptMismatch: "This transcript's file name doesn't match this recording ({file}). Add it anyway?",
+      transcriptFailed: "Couldn't add the transcript",
+      transcriptReplace: "Replace",
+      transcriptRemove: "Remove",
+      transcriptRemoveConfirm: "Remove the transcript from MIA? The file in OneDrive is not affected.",
+      copy: "Copy",
+      copied: "Copied",
+      close: "Close",
+      shareText: "Share",
+      summaryCopy: "Copy for summary",
+      summaryCopied: "Copied ✓",
+      summaryHint: "Copies the transcript with summary instructions. Paste it into Claude.",
+      openClaude: "Open Claude",
       dbError: "Couldn't open storage on this device"
     }
   };
@@ -91,6 +113,7 @@
     play: svg('<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/>', true),
     share: svg('<path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/>'),
     pencil: svg('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>'),
+    text: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>'),
     trash: svg('<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>')
   };
 
@@ -113,7 +136,9 @@
     pausedAt: null,
     pausedTotal: 0,
     wakeLock: null,
-    resume: null
+    resume: null,
+    transcriptTarget: null,
+    transcriptOpen: null
   };
 
   function t(key, params) {
@@ -395,6 +420,7 @@
       else badge(t("notExported"), "warn");
       if (record.incomplete) badge(t("incomplete"), "warn");
       if (record.origin === "imported") badge(t("importedType"));
+      if (record.transcript) badge(t("transcriptBadge"), "ok");
       if (!record.exportedAt) item.classList.add("unexported");
 
       const actions = document.createElement("div");
@@ -412,6 +438,7 @@
       };
       action(t("play"), ICONS.play, "", () => playRecord(record.id));
       action(t("export"), ICONS.share, "export", () => exportRecord(record.id));
+      action(t("transcriptShort"), ICONS.text, record.transcript ? "has-transcript" : "", () => openTranscript(record.id));
       action(t("rename"), ICONS.pencil, "", () => renameRecord(record.id));
       action(t("delete"), ICONS.trash, "danger", () => deleteRecord(record.id));
 
@@ -810,6 +837,177 @@
     }
   }
 
+  // Transcripts are made on the user's laptop (tools/transcriber) and come back
+  // through the Files app. MIA only reads the text file the user picks; it never
+  // uploads audio or text anywhere.
+  const MAX_TRANSCRIPT_BYTES = 8 * 1024 * 1024;
+
+  function baseName(fileName) {
+    return String(fileName || "").replace(/\.[^.]+$/, "");
+  }
+
+  function pickTranscript(id) {
+    state.transcriptTarget = id;
+    el("transcriptInput").click();
+  }
+
+  async function attachTranscript(file) {
+    const id = state.transcriptTarget;
+    state.transcriptTarget = null;
+    if (!file || !id) return;
+    clearWarning();
+    try {
+      if (file.size > MAX_TRANSCRIPT_BYTES) throw new Error(t("transcriptTooLarge"));
+      if (!/\.(txt|text|md)$/i.test(file.name) && !(file.type || "").startsWith("text/")) throw new Error(t("transcriptNotText"));
+      const record = await getRecord(id);
+      if (!record) return;
+      const expected = baseName(record.fileName);
+      if (expected && !file.name.startsWith(expected) &&
+          !window.confirm(t("transcriptMismatch", { file: expected + ".transcript.txt" }))) return;
+      const text = (await file.text()).replace(/^﻿/, "");
+      record.transcript = text;
+      record.transcriptName = file.name;
+      record.transcriptAddedAt = Date.now();
+      await saveRecording(record);
+      setStatus(t("transcriptAdded"), false);
+      showTranscript(record);
+    } catch (error) {
+      showWarning(t("transcriptFailed") + ": " + (error?.message || ""));
+    }
+  }
+
+  async function openTranscript(id) {
+    try {
+      const record = await getRecord(id);
+      if (!record) return;
+      if (record.transcript) showTranscript(record);
+      else pickTranscript(id);
+    } catch (error) {
+      showWarning(t("transcriptFailed") + ": " + (error?.message || ""));
+    }
+  }
+
+  function showTranscript(record) {
+    const dialog = el("transcriptDialog");
+    state.transcriptOpen = record.id;
+    el("transcriptHeading").textContent = record.title || record.fileName || t("transcript");
+    el("transcriptMeta").textContent = [record.transcriptName, record.transcriptAddedAt ? formatDate(record.transcriptAddedAt) : ""]
+      .filter(Boolean).join(" · ");
+    el("transcriptText").textContent = record.transcript || "";
+    el("transcriptText").scrollTop = 0;
+    el("openClaude").classList.remove("highlight");
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+
+  function closeTranscript() {
+    const dialog = el("transcriptDialog");
+    state.transcriptOpen = null;
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  async function copyTranscript() {
+    const record = state.transcriptOpen && await getRecord(state.transcriptOpen);
+    if (!record?.transcript) return;
+    try {
+      await navigator.clipboard.writeText(record.transcript);
+      el("transcriptCopy").querySelector("span").textContent = t("copied");
+      window.setTimeout(() => { el("transcriptCopy").querySelector("span").textContent = t("copy"); }, 1500);
+    } catch {
+      // Fall back to selecting the text so the user can copy it by hand.
+      const range = document.createRange();
+      range.selectNodeContents(el("transcriptText"));
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+
+  // Summaries are made by the user in their own Claude app (no API, no cost):
+  // MIA copies the transcript together with these instructions, and the user
+  // pastes it into Claude. MIA itself sends nothing anywhere.
+  function summaryPrompt(record) {
+    return [
+      "ช่วยสรุปการประชุมจาก transcript ด้านล่างเป็นภาษาไทย สำหรับส่งให้ผู้บริหารอ่าน",
+      "",
+      "ชื่อการประชุม: " + (record.title || record.fileName || "-"),
+      "",
+      "รูปแบบที่ต้องการ:",
+      "1. สรุปภาพรวม (3–5 บรรทัด)",
+      "2. ประเด็นสำคัญที่หารือ (bullet แยกตามหัวข้อ)",
+      "3. ข้อสรุป / การตัดสินใจ",
+      "4. Action items เป็นตาราง: งาน | ผู้รับผิดชอบ | กำหนดส่ง (ถ้าไม่มีใน transcript ให้ใส่ \"ไม่ระบุ\")",
+      "5. ประเด็นค้าง / คำถามที่ยังไม่มีคำตอบ",
+      "6. ความเสี่ยงหรือข้อกังวลที่มีการพูดถึง",
+      "",
+      "ข้อกำหนด:",
+      "- ใช้เฉพาะข้อมูลที่อยู่ใน transcript ห้ามเดาหรือเติมข้อมูลเอง",
+      "- transcript นี้ถอดเสียงด้วยเครื่อง ชื่อคน ตัวเลข และศัพท์เฉพาะอาจผิด ถ้าไม่แน่ใจให้ทำเครื่องหมาย [ตรวจสอบ]",
+      "- อ้างเวลา [ชม:นาที:วินาที] จาก transcript กำกับการตัดสินใจและ action item แต่ละข้อ",
+      "- กระชับ เป็นทางการ",
+      "",
+      "----- TRANSCRIPT -----",
+      record.transcript || ""
+    ].join("\n");
+  }
+
+  async function copyForSummary() {
+    const record = state.transcriptOpen && await getRecord(state.transcriptOpen);
+    if (!record?.transcript) return;
+    const text = summaryPrompt(record);
+    const label = el("summaryCopy").querySelector("span");
+    try {
+      await navigator.clipboard.writeText(text);
+      label.textContent = t("summaryCopied");
+      el("openClaude").classList.add("highlight");
+      window.setTimeout(() => { label.textContent = t("summaryCopy"); }, 4000);
+    } catch {
+      // Clipboard blocked: offer the iOS share sheet, where the Claude app can be picked directly.
+      try {
+        if (navigator.share) await navigator.share({ text });
+      } catch (error) {
+        if (error?.name !== "AbortError") showWarning(t("transcriptFailed") + ": " + (error?.message || ""));
+      }
+    }
+  }
+
+  async function shareTranscript() {
+    const record = state.transcriptOpen && await getRecord(state.transcriptOpen);
+    if (!record?.transcript) return;
+    const name = record.transcriptName || (baseName(record.fileName) || "MIA") + ".transcript.txt";
+    const file = new File([record.transcript], name, { type: "text/plain" });
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: record.title || t("transcript") });
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      if (error?.name !== "AbortError") showWarning(t("transcriptFailed") + ": " + (error?.message || ""));
+    }
+  }
+
+  async function removeTranscript() {
+    const id = state.transcriptOpen;
+    if (!id || !window.confirm(t("transcriptRemoveConfirm"))) return;
+    const record = await getRecord(id);
+    if (!record) return;
+    delete record.transcript;
+    delete record.transcriptName;
+    delete record.transcriptAddedAt;
+    closeTranscript();
+    await saveRecording(record);
+    setStatus(t("transcriptRemoved"), false);
+  }
+
   async function markExported(id) {
     const record = await getRecord(id);
     if (!record) return;
@@ -866,6 +1064,21 @@
       await importFile(event.target.files?.[0]);
       event.target.value = "";
     });
+    el("transcriptInput").addEventListener("change", async event => {
+      await attachTranscript(event.target.files?.[0]);
+      event.target.value = "";
+    });
+    el("transcriptClose").addEventListener("click", closeTranscript);
+    el("transcriptCopy").addEventListener("click", copyTranscript);
+    el("transcriptShare").addEventListener("click", shareTranscript);
+    el("summaryCopy").addEventListener("click", copyForSummary);
+    el("transcriptReplace").addEventListener("click", () => {
+      const id = state.transcriptOpen;
+      closeTranscript();
+      if (id) pickTranscript(id);
+    });
+    el("transcriptRemove").addEventListener("click", removeTranscript);
+    el("transcriptDialog").addEventListener("close", () => { state.transcriptOpen = null; });
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", () => {
       if (state.recorder && state.recorder.state === "recording") {
