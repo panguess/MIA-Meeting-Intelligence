@@ -1,9 +1,9 @@
-# Audio Import Policy
+# Audio import policy
 
-- Audio files must enter MIA through the iPhone app only.
-- Use the iOS document picker / Files integration for user-selected files.
-- If a file originates in Email, LINE, cloud storage, or another provider, the user selects/imports it into MIA on iPhone.
-- Explain when selecting a provider file may trigger a download to the iPhone.
-- Validate file type, size, duration, readability, and available storage before import.
-- Preserve the original source file; calculate a checksum and record import metadata.
-- Never silently upload imported audio to an external AI provider.
+1. Import starts only from an explicit user action in the MIA iPhone app.
+2. Use Apple's document picker / SwiftUI file importer.
+3. Copy the selected file into MIA's protected app container before processing.
+4. Validate extension, actual media container, duration, size, and decodability.
+5. Compute a cryptographic hash and assign an opaque internal ID.
+6. Do not automatically scan Files, mail, messaging apps, or cloud drives.
+7. If a selected file is hosted by a cloud file provider, the user must understand that the provider may download it to the device during selection.
