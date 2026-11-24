@@ -3,7 +3,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDelegate {
+final class AudioRecordingService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var statusMessage = "พร้อมบันทึก / Ready"
     @Published private(set) var warningMessage: String?
@@ -12,11 +12,17 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
     private let session = AVAudioSession.sharedInstance()
     private let store = AudioFileStore()
     private var recorder: AVAudioRecorder?
+    private var recorderDelegateProxy: AudioRecorderDelegateProxy?
     private var currentManifest: RecordingManifest?
     private var notificationTokens: [NSObjectProtocol] = []
 
     override init() {
         super.init()
+        recorderDelegateProxy = AudioRecorderDelegateProxy { [weak self] message in
+            Task { @MainActor [weak self] in
+                self?.handleRecorderEncodeError(message)
+            }
+        }
         observeAudioSessionChanges()
         refreshRecordings()
     }
@@ -26,18 +32,14 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
     }
 
     func requestMicrophonePermission() async -> Bool {
-        switch session.recordPermission {
+        switch AVAudioApplication.shared.recordPermission {
         case .granted:
             return true
         case .denied:
             statusMessage = "ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน / Microphone access denied"
             return false
         case .undetermined:
-            return await withCheckedContinuation { continuation in
-                session.requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
+            return await AVAudioApplication.requestRecordPermission()
         @unknown default:
             return false
         }
@@ -64,7 +66,7 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
             ]
 
             let newRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
-            newRecorder.delegate = self
+            newRecorder.delegate = recorderDelegateProxy
             newRecorder.isMeteringEnabled = true
             newRecorder.prepareToRecord()
 
@@ -232,13 +234,28 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
         }
     }
 
-    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
-        warningMessage = error?.localizedDescription ?? "เกิดข้อผิดพลาดขณะเข้ารหัสเสียง"
+    private func handleRecorderEncodeError(_ message: String) {
+        warningMessage = message
+        statusMessage = "เกิดข้อผิดพลาดขณะบันทึก โปรดตรวจสอบไฟล์ / Recording error — review the file"
         isRecording = false
-        self.recorder = nil
+        recorder = nil
         finalizeCurrentRecording()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
         refreshRecordings()
+    }
+}
+
+private final class AudioRecorderDelegateProxy: NSObject, AVAudioRecorderDelegate, @unchecked Sendable {
+    private let onEncodeError: @Sendable (String) -> Void
+
+    init(onEncodeError: @escaping @Sendable (String) -> Void) {
+        self.onEncodeError = onEncodeError
+        super.init()
+    }
+
+    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+        let message = error?.localizedDescription ?? "Unknown audio encoding error"
+        onEncodeError(message)
     }
 }
 
