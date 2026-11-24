@@ -781,6 +781,7 @@
       if (document.body.dataset.view === "agent") window.scrollTo({ top: 0, behavior: "smooth" });
     }
     toast("Minutes ready");
+    if (window.MIABackup) window.MIABackup.jobDone();
   }
 
   // ---------- One report per session ----------
@@ -1030,7 +1031,11 @@
     return job;
   }
 
-  function summaryText(job) { return MINUTES_PROMPT + "\n\n" + job.transcript.trim(); }
+  // Same instructions MIA's own brain uses (type-aware: meeting, class, field,
+  // other), so Claude or ChatGPT writes the report in the same format.
+  function summaryText(job) {
+    return (job.transcript || "").trim() ? finalPrompt(job) + "\n\nTranscript:\n" + job.transcript.trim() : MINUTES_PROMPT;
+  }
 
   // ---------- Export: Word (.doc) and PDF (print) ----------
   function exportHtml(job) {
@@ -1076,9 +1081,10 @@
     const job = state.jobs.find(j => j.id === state.openId);
     let text = "";
     try { text = await navigator.clipboard.readText(); } catch {}
-    if (!text) text = window.prompt("Paste the minutes from Claude here:") || "";
+    if (!text) text = window.prompt("Paste the report from ChatGPT or Claude here:") || "";
     if (!text.trim()) return;
-    job.minutes = text.trim();
+    if (job.minutes && !job.minutesMia) job.minutesMia = job.minutes;   // keep MIA's own version
+    job.minutes = takeType(job, text.trim());
     await saveJob(job);
     toast("Minutes added");
     render();
@@ -1225,6 +1231,11 @@
     $("workGo").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
     $("writeMinutes").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
     $("refineClaude").addEventListener("click", () => act("copySummary"));
+    // ChatGPT: copy, then the link opens the ChatGPT app (or chatgpt.com).
+    $("refineGpt").addEventListener("click", () => {
+      const job = state.jobs.find(j => j.id === state.openId);
+      if (job) copyText(summaryText(job), "Copied. In ChatGPT, paste and send. Then come back and tap Paste.");
+    });
     $("svcButton").addEventListener("click", openSetup);
     $("svcLink").addEventListener("click", openSetup);
     for (const g of document.querySelectorAll("[data-settings]")) g.addEventListener("click", () => $("settingsDialog").showModal());
@@ -1249,7 +1260,7 @@
   }
 
   // Small hook for tests and screenshots.
-  window.MIAAgent = { openaiKey: getOpenAIKey, typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
+  window.MIAAgent = { saveJob, toast, openaiKey: getOpenAIKey, typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
