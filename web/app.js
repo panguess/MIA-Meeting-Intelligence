@@ -655,14 +655,18 @@
           // Hand the recording to the Agent so the transcript and minutes start by
           // themselves. If iOS stopped it (call, lock), the user can still Resume;
           // the Agent then gets this first part only when they tap Minutes.
-          const handOff = () => {
+          const handOff = (stay = false) => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
-            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks }))
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay }))
               .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
           };
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
             offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
+            // iOS stopped it (call, lock, app switch). Still send this part to the
+            // Agent in the background so nothing waits on the user; the Record tab
+            // stays open so they can Resume. A resumed part becomes its own job.
+            handOff(true);
           } else {
             setStatus(t("saved"), false);
             if (!wasPossiblyInterrupted) clearWarning();

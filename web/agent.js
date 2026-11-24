@@ -750,14 +750,16 @@
       await saveJob(job);
       state.jobs.push(job);
     }
-    state.openId = job.id;
-    state.tab = job.minutes ? "minutes" : "transcript";
-    showView("agent");
+    if (!opts.stay) {
+      state.openId = job.id;
+      state.tab = job.minutes ? "minutes" : "transcript";
+      showView("agent");
+    }
     render();
     // Start (or continue) unless the minutes are done or it's already running.
     if (!job.minutes && running !== job.id) {
       if (TRANSCRIBER.ready) processJob(job);
-      else openSetup();
+      else if (!opts.stay) openSetup();
     }
     return job;
   }
