@@ -533,6 +533,7 @@
     }
 
     try {
+      audioMode("play-and-record");
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           // No echo cancelling or noise removal: they can clip quiet speech.
@@ -1007,6 +1008,12 @@
       state.stream.getTracks().forEach(track => track.stop());
       state.stream = null;
     }
+    audioMode("playback");
+  }
+  // iOS 17+: while the mic is in use the iPhone plays sound quietly (call mode).
+  // Switch back to normal media playback whenever the mic is off.
+  function audioMode(type) {
+    try { if (navigator.audioSession) navigator.audioSession.type = type; } catch {}
   }
 
   function fileExtension(mime) {
@@ -1065,12 +1072,20 @@
     }
   }
   // Last resort for playback: decode with Web Audio and play a WAV copy.
-  async function wavCopy(blob) {
+  async function wavCopy(blob, boost = false) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx({ sampleRate: 16000 });
     const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
     ctx.close && ctx.close();
-    const ch = audio.getChannelData(0), n = ch.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const ch = audio.getChannelData(0), n = ch.length;
+    let peak = 0; for (let i = 0; i < n; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; }
+    const gain = peak > 0.001 && peak < 0.5 ? Math.min(10, 0.9 / peak) : 1;
+    if (boost) {
+      diagApp("Playback level: peak " + peak.toFixed(3) + (gain > 1 ? ", made " + gain.toFixed(1) + "x louder" : ", normal"));
+      if (gain === 1) return null;
+      for (let i = 0; i < n; i++) ch[i] *= gain;
+    }
+    const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
     w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
     v.setUint32(24, audio.sampleRate, true); v.setUint32(28, audio.sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
@@ -1093,8 +1108,13 @@
       const record = await getRecord(id);
       if (!record?.blob) throw new Error("Audio file not found");
       revokeObjectUrl(id);
+      if (!state.stream) audioMode("playback");
       const blob = await freshBlob(record);
-      const url = URL.createObjectURL(blob);
+      let url = URL.createObjectURL(blob);
+      // Quiet recording: play a louder copy (clips up to 20 min, to spare memory).
+      if ((record.durationSeconds || 0) <= 1200) {
+        try { const loud = await wavCopy(blob, true); if (loud) { URL.revokeObjectURL(url); url = URL.createObjectURL(loud); } } catch {}
+      }
       state.currentObjectUrls.set(id, url);
 
       const recordElement = document.querySelector(`[data-record-id="${CSS.escape(id)}"]`);
