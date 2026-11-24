@@ -6,9 +6,9 @@
 // To ship an update, change CACHE_NAME. The new version is downloaded the next
 // time MIA is opened while the server is reachable, and is used from the
 // launch after that.
-const CACHE_NAME = "mia-pwa-v0.4.1";
+const CACHE_NAME = "mia-pwa-v0.4.2";
 const SHELL = "./index.html";
-const ASSETS = ["./", SHELL, "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-180.png"];
+const ASSETS = ["./", SHELL, "./app.js", "./manifest.webmanifest", "./icon.svg", "./icon-180.png", "./fonts/fredoka-latin-600-normal.woff2", "./fonts/nunito-latin-700-normal.woff2", "./fonts/nunito-latin-800-normal.woff2"];
 
 self.addEventListener("install", event => {
   event.waitUntil(

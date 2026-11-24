@@ -40,7 +40,7 @@ For an online meeting, place the iPhone near the laptop speaker. MIA records sou
 
 Implemented: live microphone recording, local IndexedDB storage, recovery of saved chunks, optional local audio import, playback, export, deletion, rename, attaching and reading a transcript, and an English interface designed for iPhone.
 
-Transcripts are made on the user's own Windows laptop, not in the app: export the recording to `OneDrive › Desktop › MIA › Inbox`, the laptop transcriber writes `<name>.transcript.txt` back to that folder, then tap **Transcript** on the recording and pick that file. See [the laptop transcriber](../tools/transcriber/README.md).
+Transcripts are made on the user's own Windows laptop, not in the app: export the recording to `OneDrive › Desktop › MIA › Inbox`, the laptop transcriber writes `<name>.transcript.txt` back to that folder, then tap **Text** on the recording and pick that file. See [the laptop transcriber](../tools/transcriber/README.md).
 
 Summaries: in the transcript viewer, **Copy for summary** copies the transcript with Thai summary instructions; paste it into the Claude app. MIA sends nothing itself.
 
