@@ -1,26 +1,22 @@
-# MIA — Meeting Intelligence Assistant
+# MIA Starter Kit v0.1
 
-MIA is a personal-first, enterprise-ready meeting intelligence assistant.
+Status: engineering scaffold only — not a deployable or security-certified product.
 
-## Product baseline
-- iPhone is the only audio capture and audio-file import entry point.
-- Supports physical meetings and online meetings through acoustic capture (e.g. iPhone near laptop speakers during Teams meetings).
-- No meeting bots, Teams API audio ingestion, browser extensions, or desktop audio capture.
-- Thai and English, including code-switching.
-- Outputs: full transcript, detailed meeting minutes, executive summary, action tracker, and risk & issue log.
-- Human approval is required before finalizing reports.
-- Audio retention target: 90 days.
+## Product constraints
+- iPhone is the only audio entry point.
+- Live recording uses the iPhone microphone.
+- Teams/Zoom/Meet bots and direct meeting-platform audio capture are out of scope.
+- External recordings are imported by the user through the iPhone app.
+- Default AI mode is local-first. Cloud AI remains disabled until separately approved.
+- Audio retention target is 90 days.
+- Human approval is required before minutes become final.
 
-## Repository status
-This repository contains an initial development scaffold. It is **not production-ready**, has not been security-certified, and has not been compiled or validated on a physical iPhone.
+## Repository layout
+- `ios/MIA/` — SwiftUI/AVFoundation recording prototype source.
+- `backend/` — FastAPI service skeleton.
+- `database/` — initial PostgreSQL schema draft.
+- `contracts/` — API outline.
+- `security/` — security baseline and threat-model checklist.
 
-## Structure
-- `ios/MIA`: Swift/AVFoundation recording and import policy scaffold.
-- `backend`: minimal FastAPI service skeleton and security notes.
-- `database`: initial PostgreSQL schema draft.
-- `contracts`: API outline.
-- `security`: threat-model checklist.
-- `docs`: architecture decision log.
-
-## Security
-Do not commit meeting audio, transcripts, credentials, API keys, personal data, or production secrets. Keep the repository private. Treat all sample code and schemas as drafts pending review.
+## Important
+Do not use confidential or production meeting recordings with this scaffold. It has not been penetration-tested, compiled as a complete iOS app, or deployed. Secrets are intentionally absent.
