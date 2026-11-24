@@ -759,7 +759,10 @@
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i], text = (res[0] && res[0].transcript || "").trim();
           if (!text) continue;
-          if (res.isFinal) { live.lines.push({ at: Math.round(elapsedSeconds()), text }); liveSave(); }
+          // Time = when the sentence STARTED (iOS can take a minute to
+          // finalise a long sentence), not when it was finalised.
+          if (live.segAt == null) live.segAt = Math.max(0, Math.round(elapsedSeconds()) - 2);
+          if (res.isFinal) { live.lines.push({ at: live.segAt, text }); live.segAt = null; liveSave(); }
           else interim += " " + text;
         }
         live.interim = interim.trim();
@@ -774,6 +777,9 @@
       };
       r.onend = () => {
         live.all.delete(r);
+        // A session that ends without a final result: keep what was heard.
+        if (r === live.rec && live.interim) { live.lines.push({ at: live.segAt != null ? live.segAt : Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; liveSave(); }
+        if (r === live.rec) live.segAt = null;
         if (live.on && r === live.rec) setTimeout(() => { if (live.on && r === live.rec && !state.pausedAt && state.recorder) run(); }, 250);
       };
       live.rec = r;
@@ -810,7 +816,8 @@
   function liveStop() {
     live.on = false;
     clearInterval(live.dog);
-    if (live.interim) { live.lines.push({ at: Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
+    if (live.interim) { live.lines.push({ at: live.segAt != null ? live.segAt : Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
+    live.segAt = null;
     liveKill();
     const text = liveAsText(live.lines);
     if (live.id) { try { localStorage.removeItem(liveKey(live.id)); } catch {} }

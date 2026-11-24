@@ -156,7 +156,7 @@
     "## Issues & risks (Markdown table: Issue | Risk / impact | Severity High/Medium/Low (your judgement, mark [verify] if unsure))",
     "## Follow-ups (Markdown table: Action | Owner | Due date; '-' if not said)",
     "## Open questions (things still to confirm)",
-    "Write 'None' under a heading only if there is truly nothing. Keep every number, name and date exactly; write [verify] when unclear."
+    "Leave out any heading that has nothing from the recording. Keep every number, name and date exactly; write [verify] when unclear."
   ].join("\n");
   // Anything else: no template. Infer the best report for the purpose.
   const SMART_PROMPT = [
@@ -248,7 +248,7 @@
   function statusOf(job) {
     if (job.minutes) return { label: "Minutes ready", tone: "mint", icon: "check" };
     if (job.transcript) return { label: "Transcript ready", tone: "sky", icon: "text" };
-    if (job.status === "working") return { label: (job.stage === "minutes" ? "Writing minutes" : "Working") + " · " + Math.round(job.progress || 0) + "%", tone: "sun", icon: "pct" };
+    if (job.status === "working") return { label: (job.step || "Working") + " · " + Math.round(job.progress || 0) + "%", tone: "sun", icon: "pct" };
     if (job.status === "error") return { label: "Needs attention", tone: "peach", icon: "alert" };
     if (job.status === "paused") return { label: "Paused · " + Math.round(job.progress || 0) + "%", tone: "lilac", icon: "pct" };
     return { label: "Waiting to transcribe", tone: "lilac", icon: "wait" };
@@ -264,6 +264,34 @@
       setTimeout(() => resolve(0), 4000);
     });
   }
+  // ---------- Diagnostics ----------
+  // A short log kept on this iPhone (no keys, no transcript text) that the
+  // user can copy from Settings and send to us when something goes wrong.
+  function diag(msg) {
+    try {
+      const log = JSON.parse(localStorage.getItem("mia-diag") || "[]");
+      const ver = (document.querySelector(".ver") || {}).textContent || "";
+      log.push(new Date().toLocaleString() + " · " + ver + " · " + msg);
+      localStorage.setItem("mia-diag", JSON.stringify(log.slice(-60)));
+    } catch {}
+    renderDiag();
+  }
+  function renderDiag() {
+    const el = document.getElementById("diagLog");
+    if (!el) return;
+    let log = [];
+    try { log = JSON.parse(localStorage.getItem("mia-diag") || "[]"); } catch {}
+    el.textContent = log.length ? log.slice().reverse().join("\n") : "No problems recorded.";
+  }
+  function warnJob(job, msg) {
+    job.warnings = [...new Set([...(job.warnings || []), msg])];
+    diag(msg);
+  }
+  const why = (e, who) => !e ? who + " failed" :
+    e.name === "AbortError" ? who + " took too long (no answer in time)" :
+    e instanceof TypeError ? who + " couldn't be reached (network, or the service blocks apps in a browser): " + e.message :
+    who + ": " + (e.message || e);
+
   function toast(msg) {
     const box = $("agentToast");
     box.textContent = msg;
@@ -434,6 +462,8 @@
     $("detailPill").textContent = s.label;
     $("detailPill").className = "detail-pill " + s.tone;
     $("detailMeta").textContent = [fmtDate(job.createdAt), fmtDur(job.duration), "Thai + English"].filter(Boolean).join(" · ");
+    $("jobWarn").textContent = (job.warnings || []).map(w => "⚠ " + w).join("\n");
+    $("jobWarn").classList.toggle("hidden", !(job.warnings || []).length);
 
     const done = !!job.transcript && (job.transcriptComplete || job.status === "done");
     $("detailWorking").classList.toggle("hidden", done);
@@ -447,16 +477,16 @@
       $("ringPct").textContent = pct + "%";
       const working = job.status === "working";
       const ready = TRANSCRIBER.ready;
-      $("workTitle").textContent = working ? (job.stage === "minutes" ? "Writing your minutes…" : "Listening carefully…")
+      $("workTitle").textContent = working ? (job.step || "Working") + "…"
         : job.status === "error" ? "Something went wrong" : job.status === "paused" ? "Paused" : ready ? "Ready to start" : "One-time setup needed";
       $("workSub").textContent = working
-        ? (waitNote || "Keep MIA open on screen. Work is saved in 5-minute parts.")
+        ? (waitNote || (job.stuck ? "Taking longer than usual. Check the internet, or tap Retry." : "Elapsed " + clock(Date.now() - (job.workStart || Date.now())) + " · keep MIA open on screen."))
         : job.status === "error" ? (job.error || "Try again.")
         : job.status === "paused" ? "Saved so far. Tap Continue to pick up where it stopped."
         : ready ? "Your audio is saved on this iPhone." : "Connect the free Groq service once, then MIA does the rest.";
       const go = $("workGo");
-      go.classList.toggle("hidden", working);
-      go.textContent = !ready ? "Set up Groq · free" : job.status === "paused" || (job.parts && job.parts.length) ? "Continue" : job.status === "error" ? "Try again" : "Start";
+      go.classList.toggle("hidden", working && !job.stuck);
+      go.textContent = working && job.stuck ? "Retry" : !ready ? "Set up Groq · free" : job.status === "paused" || (job.parts && job.parts.length) ? "Continue" : job.status === "error" ? "Try again" : "Start";
       $("workLeft").textContent = working && job.eta ? "~ " + job.eta + " min" : "–";
       $("workHeard").textContent = working && job.heard ? job.heard : "–";
       const step = job.stage === "minutes" ? 4 : (job.parts && job.parts.length) || working ? 2 : 1;
@@ -496,7 +526,9 @@
       const busy = job.status === "working";
       $("writeMinutes").classList.toggle("hidden", busy);
       $("writeMinutes").textContent = TRANSCRIBER.ready ? (busy ? "Writing…" : "Write minutes now") : "Set up Groq · free";
-      $("minutesEmptyTitle").textContent = busy ? "Writing your minutes…" : "No minutes yet";
+      $("minutesEmptyTitle").textContent = busy ? stepLine(job) : "No minutes yet";
+      $("writeMinutes").classList.toggle("hidden", busy && !job.stuck);
+      if (busy && job.stuck) $("writeMinutes").textContent = "Taking long · Retry";
       $("minutesFilled").classList.toggle("hidden", !has);
       if (has) {
         const st = minutesStats(job.minutes);
@@ -509,6 +541,7 @@
         $("kindNote").textContent = job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected";
         $("mStats").classList.toggle("hidden", kind !== "meeting");
         $("improveBtn").classList.toggle("hidden", job.source !== "live" || !job.audio);
+        $("improveNote").classList.toggle("hidden", job.source !== "live" || !job.audio);
         const out = job.outLang || (job.lang === "en" ? "en" : "th");
         for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
       }
@@ -635,11 +668,17 @@
     let res;
     try {
       res = await fetch(TYPHOON + "/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + getTyphoonKey() }, body: form, signal: ctl.signal });
+    } catch (e) {
+      if (attempt < 1 && e.name !== "AbortError") { await sleep(3000); return typhoonFile(blob, attempt + 1); }
+      throw e;
     } finally { clearTimeout(timer); }
     if ((res.status === 429 || res.status >= 500) && attempt < 3) { await sleep(5000 * (attempt + 1)); return typhoonFile(blob, attempt + 1); }
     const data = await res.json().catch(() => ({}));
     if (!res.ok && tyModel !== MODEL_PREFS.typhoon.def && (res.status === 400 || res.status === 404)) { dropModel("typhoon"); return typhoonFile(blob, attempt); }
-    if (!res.ok) throw new Error("Typhoon " + res.status);
+    if (!res.ok) {
+      const d = data.error && (data.error.message || data.error) || data.detail || data.message || "";
+      throw new Error("HTTP " + res.status + (res.status === 401 || res.status === 403 ? " (key not accepted)" : "") + (d ? " · " + String(typeof d === "string" ? d : JSON.stringify(d)).slice(0, 160) : ""));
+    }
     return (data.text || "").trim();
   }
   // One-minute pieces keep each upload small and give rough time anchors.
@@ -734,7 +773,15 @@
   // Shrinks notes until they fit one request, then writes the minutes.
   // Meeting -> minutes format; presentation or lecture -> talk summary.
   // "auto" lets the model decide and report it on the first line.
-  function finalPrompt(job) {
+  // Applies to every report type: no invented content, length follows the audio.
+  const HONEST = [
+    "RULES THAT OVERRIDE THE FORMAT ABOVE:",
+    "- Include a section only if the recording actually contains material for it. Leave out sections that would be empty or guessed (no 'None' sections, except formal meeting minutes).",
+    "- Never invent risks, actions, owners, deadlines, KPIs, advice, coaching or next steps that nobody said. Do not judge the speaker's feelings or performance.",
+    "- Match the length to the recording: under 3 minutes of speech → a few sentences and at most 6 bullets; longer recordings → as long as the content needs.",
+    "- If the transcript is too garbled to understand, say so in one line and summarise only what is clear."
+  ].join("\n");
+  function finalPrompt(job, kind) {
     const mk = (job.marks || []).map(stamp);
     const marksNote = mk.length ? "\nThe user bookmarked these moments as important while recording: " + mk.join(", ") +
       ". Make sure what was said around each time is covered, and put a ★ before those points." : "";
@@ -746,20 +793,21 @@
       "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown.";
     const tail = "\nWrite headings in the output language. Keep English terms in English as spoken.\nOutput only the Markdown.";
     const field = FIELD_PROMPT + tail, smart = SMART_PROMPT + tail;
-    if (job.kind === "meeting") return "TYPE: meeting\n" + FINAL_PROMPT + lang;
-    if (job.kind === "talk") return talk + lang;
-    if (job.kind === "field") return field + lang;
-    if (job.kind === "other") return smart + lang;
+    kind = kind || job.detectedKind || job.kind;
+    if (kind === "meeting") return FINAL_PROMPT + "\n" + HONEST + lang;
+    if (kind === "talk") return talk + "\n" + HONEST + lang;
+    if (kind === "field") return field + "\n" + HONEST + lang;
+    if (kind === "other") return smart + "\n" + HONEST + lang;
     return "First decide what was recorded:\n" +
       "- MEETING: several people discussing, deciding, assigning work.\n" +
       "- TALK: one main speaker presenting, teaching, lecturing or briefing an audience.\n" +
       "- FIELD: one person dictating their own observations or notes while on site (e.g. a stock count, store visit, inspection, audit walk-through), often coming back to earlier points.\n" +
       "- OTHER: anything else (interview, phone call, brainstorm, voice memo, ...).\n" +
       "Write the first line exactly as TYPE: meeting, TYPE: talk, TYPE: field or TYPE: other. Then follow the matching instructions.\n\n" +
-      "If meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + "\n\nIf field:\n" + field + "\n\nIf other:\n" + smart + lang;
+      "If meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + "\n\nIf field:\n" + field + "\n\nIf other:\n" + smart + "\n\n" + HONEST + lang;
   }
   function takeType(job, text) {
-    const m = text.match(/^\s*\**TYPE:\s*(meeting|talk|field|other)\**\s*\n/i);
+    const m = text.match(/^\s*\**\s*(?:TYPE\s*:\s*)?(meeting|talk|field|other)\s*\**\s*(?::\s*|\n)/i);
     if (m) { job.detectedKind = m[1].toLowerCase(); return text.slice(m[0].length).trim(); }
     if (job.kind !== "auto" && job.kind) job.detectedKind = job.kind;
     return text;
@@ -791,12 +839,38 @@
     return out;
   }
 
+  // Auto type: decide first with a small call, then write with ONE format,
+  // so formats never get mixed (e.g. a risk table on a casual voice memo).
+  const CLASSIFY_PROMPT = [
+    "Classify this machine transcript (Thai/English; may contain recognition errors). Answer with ONE word only:",
+    "meeting = several people discussing, deciding, assigning work;",
+    "talk = one main speaker teaching, lecturing, presenting or briefing an audience;",
+    "field = one person dictating observations or notes on site (stock count, store visit, inspection, audit walk-through);",
+    "other = anything else (casual talk, phone call, interview, voice memo, brainstorm)."
+  ].join("\n");
+  async function detectKind(job) {
+    if (job.kind && job.kind !== "auto") return job.kind;
+    const t = job.transcript || "";
+    const sample = t.length > 6000 ? t.slice(0, 3000) + "\n...\n" + t.slice(Math.floor(t.length / 2), Math.floor(t.length / 2) + 1500) + "\n...\n" + t.slice(-1500) : t;
+    try {
+      const out = (await chat(CLASSIFY_PROMPT, sample, 400, "low")).toLowerCase();
+      const m = out.match(/\b(meeting|talk|field|other)\b/);
+      if (m) return m[1];
+    } catch {}
+    return "";
+  }
+
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
-    const prompt = finalPrompt(job);
+    const r0 = job.reportFrom || 5;
+    if (!job.kind || job.kind === "auto") setStep(job, "Checking what kind of recording", r0, r0 + (99 - r0) * 0.15, 4);
+    const kind = await detectKind(job);
+    setStep(job, "Writing the report", r0 + (99 - r0) * 0.15, 99, Math.min(90, 15 + transcript.length / 800));
+    if (kind) job.detectedKind = kind;
+    const prompt = finalPrompt(job, kind);
     if (getOpenAIKey() && brainOn() && transcript.length < 600000) {
       try { const r = takeType(job, await openaiChat(prompt, "Transcript:\n" + transcript)); job.brain = "openai"; return r; }
-      catch (e) { toast("OpenAI couldn't write the report (" + (e && e.message || "error") + "). Using the free brain."); }
+      catch (e) { warnJob(job, why(e, "OpenAI report") + " → used the free brain"); toast("OpenAI couldn't write the report. Using the free brain."); }
     }
     job.brain = "groq";
     if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 4000, "medium"));
@@ -836,6 +910,34 @@
     }
     toast("Minutes ready");
     if (window.MIABackup) window.MIABackup.jobDone();
+  }
+
+  // ---------- Live progress ----------
+  // Each step has a label, a % range and a typical duration. Between real
+  // updates the % keeps creeping forward (never past the step's end), so the
+  // user can see MIA is working. If a step runs far longer than usual, a
+  // "Taking longer than usual" note with Retry appears.
+  let ticker = null;
+  function setStep(job, label, from, to, typicalSec) {
+    job.step = label; job.stepFrom = from; job.stepTo = to; job.stepSec = typicalSec || 20; job.stepAt = Date.now();
+    job.progress = Math.max(job.progress || 0, from);
+    if (!ticker) ticker = setInterval(tickProgress, 1000);
+    tickProgress();
+  }
+  function tickProgress() {
+    const job = state.jobs.find(j => j.id === running);
+    if (!job || job.status !== "working") { clearInterval(ticker); ticker = null; return; }
+    const t = (Date.now() - (job.stepAt || Date.now())) / 1000;
+    const span = (job.stepTo || 99) - (job.stepFrom || 0);
+    const p = (job.stepFrom || 0) + span * 0.95 * (1 - Math.exp(-t / (job.stepSec || 20)));
+    job.progress = Math.min(99, Math.max(job.progress || 0, p));
+    job.stuck = t > Math.max(150, (job.stepSec || 20) * 6);
+    if (state.openId === job.id) renderDetail();
+    renderList();
+  }
+  const clock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  function stepLine(job) {
+    return (job.step || "Starting") + " · " + Math.round(job.progress || 0) + "% · " + clock(Date.now() - (job.workStart || Date.now()));
   }
 
   // ---------- One report per session ----------
@@ -886,6 +988,8 @@
     if (!getKey()) return openSetup();
     running = job.id;
     job.status = "working"; job.error = ""; job.oaWarned = false; job.tyWarned = false;
+    job.workStart = Date.now(); job.progress = 0; job.stuck = false; job.warnings = [];
+    setStep(job, "Getting ready", 0, 3, 3);
     await saveJob(job); render();
     const t0 = Date.now();
     let stepsDone = 0;
@@ -894,7 +998,7 @@
         if (job.parentId) return await childDone(job);
         if (job.ownTranscript == null) job.ownTranscript = job.transcript;
         composeSeries(job);
-        job.stage = "minutes"; render();
+        job.stage = "minutes"; job.reportFrom = 5; render();
         job.minutes = await writeMinutes(job);
         job.status = "done"; job.progress = 100; job.stage = "";
         await saveJob(job);
@@ -913,15 +1017,18 @@
         const per = stepsDone ? (Date.now() - t0) / stepsDone : 40000;
         job.eta = Math.max(1, Math.round((total - done) * per / 60000));
       };
+      const pr = (i, a) => Math.round((i + a) / n * 88);   // transcription = 0-88%
       for (let i = 0; i < n; i++) {
         job.parts[i] = job.parts[i] || {};
+        const tag = n > 1 ? "Part " + (i + 1) + " of " + n + " · " : "";
         if (job.parts[i].text == null) {
+          setStep(job, tag + (getOpenAIKey() && !job.oaWarned ? "Listening (OpenAI)" : getTyphoonKey() ? "Listening (Whisper + Typhoon)" : "Listening (Whisper)"), pr(i, 0), pr(i, 0.6), 30);
           const p = split.part(i);
           // OpenAI first if the user turned it on; Groq Whisper (+Typhoon) otherwise
           // or if OpenAI fails.
           let best = "";
           if (getOpenAIKey() && !job.oaWarned) {
-            best = await openaiPart(p).catch(e => { if (!job.oaWarned) { job.oaWarned = true; toast("OpenAI didn't answer (" + (e && e.message || "error") + "). Using the free engines."); } return ""; });
+            best = await openaiPart(p).catch(e => { if (!job.oaWarned) { job.oaWarned = true; warnJob(job, why(e, "OpenAI") + " → used the free engines"); toast("OpenAI didn't answer. Using the free engines."); } return ""; });
           }
           if (best) {
             job.parts[i].raw = best; job.parts[i].text = best; job.engine = "openai";
@@ -929,7 +1036,7 @@
           // Whisper (Groq) and, if connected, Typhoon listen to the same part.
           const [raw, thai] = await Promise.all([
             transcribePart(p.blob, p.offset, job.lang, p.name),
-            getTyphoonKey() ? typhoonPart(p).catch(e => { if (!job.tyWarned) { job.tyWarned = true; toast("Typhoon didn't answer (" + (e && e.message || "error") + "). Using Whisper only."); } return ""; }) : Promise.resolve("")
+            getTyphoonKey() ? typhoonPart(p).catch(e => { if (!job.tyWarned) { job.tyWarned = true; warnJob(job, why(e, "Typhoon") + " → used Whisper only"); toast("Typhoon didn't answer. Using Whisper only (see the note on this job)."); } return ""; }) : Promise.resolve("")
           ]);
           job.parts[i].raw = raw;
           job.parts[i].thai = thai;
@@ -939,6 +1046,7 @@
           // Kept only if it keeps the time stamps and roughly the same length.
           if (raw.trim()) {
             try {
+              setStep(job, tag + (thai ? "Merging both versions" : "Fixing misheard words"), pr(i, 0.6), pr(i, long ? 0.85 : 1), 20);
               const terms = getTerms();
               const termNote = terms ? "\nNames and terms that may appear: " + terms : "";
               const fixed = thai
@@ -956,15 +1064,18 @@
         }
         job.transcript = job.parts.map(x => x.text || "").filter(Boolean).join("\n");
         if (long && job.parts[i].notes == null) {
+          setStep(job, tag + "Taking notes", pr(i, 0.85), pr(i, 1), 12);
           job.parts[i].notes = job.parts[i].text ? await chat(PART_PROMPT, "Part " + (i + 1) + " of " + n + ":\n" + job.parts[i].text, 700) : "";
           stepsDone++;
         }
         tick();
+        job.progress = Math.max(job.progress || 0, pr(i, 1));
         await saveJob(job);
         if (state.openId === job.id) render(); else renderList();
       }
       if (!job.transcript.trim()) throw new Error("No speech was found in this recording.");
       job.transcriptComplete = true;
+      job.reportFrom = 88;
       if (job.parentId) return await childDone(job);
       job.ownTranscript = job.transcript; job.ownParts = null;
       composeSeries(job);
@@ -977,6 +1088,7 @@
     } catch (e) {
       job.status = "error"; job.stage = "";
       job.error = e && e.message ? e.message : "Something went wrong.";
+      diag("Job failed: " + job.error);
       await saveJob(job);
       if (e instanceof KeyError) openSetup();
     } finally {
@@ -1307,10 +1419,21 @@
     $("pasteMinutes").addEventListener("click", pasteMinutes);
     $("replaceMinutes").addEventListener("click", pasteMinutes);
     $("deleteJob").addEventListener("click", removeJob);
-    $("workGo").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
-    $("writeMinutes").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
+    // Retry on a stuck job reloads MIA (drops the hung request) and restarts it;
+    // finished 5-minute parts are kept.
+    const go = () => {
+      const j = state.jobs.find(x => x.id === state.openId);
+      if (!j) return;
+      if (j.status === "working" && j.stuck) { diag("Retry after a stuck step: " + (j.step || "")); try { sessionStorage.setItem("mia-retry", j.id); } catch {} location.reload(); return; }
+      processJob(j);
+    };
+    $("workGo").addEventListener("click", go);
+    $("writeMinutes").addEventListener("click", go);
     $("refineClaude").addEventListener("click", () => act("copySummary"));
     $("stGroq").addEventListener("click", () => { if (!getKey()) openSetup(); });
+    renderDiag();
+    $("diagCopy").addEventListener("click", () => { let t = ""; try { t = JSON.parse(localStorage.getItem("mia-diag") || "[]").join("\n"); } catch {} copyText(t || "No problems recorded.", "Copied. Paste it in the chat with Claude."); });
+    $("diagClear").addEventListener("click", () => { try { localStorage.removeItem("mia-diag"); } catch {} renderDiag(); });
     // ChatGPT: copy, then the link opens the ChatGPT app (or chatgpt.com).
     $("refineGpt").addEventListener("click", () => {
       const job = state.jobs.find(j => j.id === state.openId);
@@ -1332,7 +1455,10 @@
       state.db = await openDb();
       state.jobs = await loadJobs();
       // A job that was running when MIA closed is paused; its finished parts are kept.
-      for (const j of state.jobs) if (j.status === "working") { j.status = "paused"; j.stage = ""; saveJob(j); }
+      for (const j of state.jobs) if (j.status === "working") { j.status = "paused"; j.stage = ""; saveJob(j); diag("MIA was closed or reloaded during: " + (j.step || "a job") + " (" + Math.round(j.progress || 0) + "%)"); }
+      let retry = ""; try { retry = sessionStorage.getItem("mia-retry") || ""; sessionStorage.removeItem("mia-retry"); } catch {}
+      const rj = retry && state.jobs.find(j => j.id === retry);
+      if (rj && TRANSCRIBER.ready) { state.openId = rj.id; setTimeout(() => processJob(rj), 300); }
     } catch {
       toast("Storage isn't available in this browser.");
     }
