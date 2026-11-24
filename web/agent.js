@@ -334,11 +334,18 @@
     if (!key) throw new KeyError("Set up Groq first.");
     let res;
     try {
-      res = await fetch(GROQ + path, {
-        method: "POST",
-        headers: body instanceof FormData ? { Authorization: "Bearer " + key } : { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-        body: body instanceof FormData ? body : JSON.stringify(body)
-      });
+      // A request that hangs (weak signal, iOS suspending the page) is
+      // abandoned after 3 minutes and retried, so the queue never gets stuck.
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 180000);
+      try {
+        res = await fetch(GROQ + path, {
+          method: "POST",
+          headers: body instanceof FormData ? { Authorization: "Bearer " + key } : { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+          body: body instanceof FormData ? body : JSON.stringify(body),
+          signal: ctl.signal
+        });
+      } finally { clearTimeout(timer); }
     } catch {
       if (attempt < 6) { await sleep(5000 * (attempt + 1)); return groq(path, body, attempt + 1); }
       throw new Error("No internet connection. Tap Continue when you're back online.");
@@ -476,7 +483,10 @@
 
   let running = null;
   async function processJob(job) {
-    if (running) return toast("Another job is running. This one will wait.");
+    if (running) {
+      if (job.status !== "queued") { job.status = "queued"; await saveJob(job); render(); }
+      return toast("Queued: starts when the current job finishes.");
+    }
     if (!getKey()) return openSetup();
     running = job.id;
     job.status = "working"; job.error = "";
@@ -551,6 +561,9 @@
     } finally {
       running = null;
       render();
+      // Start the next recording that was waiting its turn.
+      const next = state.jobs.find(j => j.status === "queued" && !j.minutes);
+      if (next && getKey()) setTimeout(() => processJob(next), 0);
     }
   }
 
@@ -761,7 +774,7 @@
   }
 
   // Small hook for tests and screenshots.
-  window.MIAAgent = { state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
+  window.MIAAgent = { busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

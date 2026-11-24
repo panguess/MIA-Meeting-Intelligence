@@ -594,6 +594,8 @@
       });
 
       recorder.addEventListener("stop", async () => {
+        state.saving = true;
+        setTimeout(() => { state.saving = false; }, 15000);
         const endedAt = Date.now();
         const recordingId = state.recordingId;
         const recordedSeconds = elapsedSeconds(endedAt);
@@ -1083,8 +1085,11 @@
       let reloaded = false;
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (!hadController || reloaded) return;
-        const reload = () => { if (!reloaded && !state.recorder) { reloaded = true; location.reload(); } };
-        if (!state.recorder) reload();
+        // Also wait while a recording is being saved and handed to the Agent,
+        // or while the Agent is working, so an update never drops a job.
+        const busy = () => state.recorder || state.saving || (window.MIAAgent && window.MIAAgent.busy());
+        const reload = () => { if (!reloaded && !busy()) { reloaded = true; location.reload(); } };
+        if (!busy()) reload();
         else document.addEventListener("visibilitychange", reload);
       });
     }
