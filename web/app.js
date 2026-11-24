@@ -50,8 +50,9 @@
       noAudio: "ไม่พบข้อมูลเสียงในไฟล์นี้",
       noExport: "ส่งออกไฟล์ไม่สำเร็จ",
       permissionTip: "อนุญาตใช้ไมโครโฟนเมื่อ Safari ถาม",
-      backgroundWarning: "ข้อจำกัด iOS: Safari อาจหยุดบันทึกเมื่อถูกพักหรือหน้าจอล็อก จึงต้องเปิด MIA ค้างไว้และอย่าใช้กับการประชุมสำคัญจนกว่าจะทดสอบกับ iPhone จริง",
-      installHint: "เพิ่ม MIA ไปยังหน้าจอโฮม: Safari → Share → Add to Home Screen",
+      backgroundWarning: "ข้อจำกัด iOS: Safari อาจหยุดบันทึกเมื่อสลับแอป ล็อกหน้าจอ หรือมีสายเข้า ให้เปิด MIA ค้างไว้และอย่าล็อกหน้าจอ การบันทึกต่อเนื่องไม่รับประกัน ทดสอบกับ iPhone จริงก่อนใช้กับการประชุมสำคัญ",
+      foregroundNote: "สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้ใน Safari และอย่าล็อกหน้าจอ iOS อาจหยุดหรือพักการบันทึกเมื่อสลับแอปหรือมีสายเข้า จึงไม่รับประกันว่าจะบันทึกครบทั้งการประชุม",
+      installHint: "เพิ่ม MIA ไปยังหน้าจอโฮม: เปิดด้วย Safari → แตะ Share → Add to Home Screen (ต้องใช้ลิงก์ HTTPS)",
       dbError: "เปิดพื้นที่จัดเก็บในอุปกรณ์ไม่ได้"
     },
     en: {
@@ -94,8 +95,9 @@
       noAudio: "No audio data was found in this file",
       noExport: "Could not export audio",
       permissionTip: "Allow microphone access when Safari asks",
-      backgroundWarning: "iOS limitation: Safari may suspend recording when backgrounded or when the screen locks. Keep MIA in the foreground. Do not use it for important meetings until tested on the actual iPhone.",
-      installHint: "Add MIA to Home Screen: Safari → Share → Add to Home Screen",
+      backgroundWarning: "iOS limitation: Safari may stop or suspend recording when you switch apps, lock the screen, or receive a call. Keep MIA open and the screen unlocked. Continuous recording is not guaranteed; test on the actual iPhone before an important meeting.",
+      foregroundNote: "Important: keep MIA open in Safari and leave the screen unlocked while recording. iOS may stop or suspend recording when you switch apps or receive a call, so a complete meeting recording is not guaranteed.",
+      installHint: "Add MIA to Home Screen: open the HTTPS link in Safari → Share → Add to Home Screen.",
       dbError: "Could not open local on-device storage"
     }
   };
