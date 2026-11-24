@@ -1,0 +1,34 @@
+name: PWA checks
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-check.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-check.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate JavaScript syntax
+        run: node --check web/app.js
+
+      - name: Validate PWA manifest
+        run: python3 -m json.tool web/manifest.webmanifest > /dev/null
+
+      - name: Verify required static assets
+        run: |
+          test -s web/index.html
+          test -s web/app.js
+          test -s web/manifest.webmanifest
+          test -s web/sw.js
+          test -s web/icon.svg
+          test -s web/_headers
