@@ -211,6 +211,7 @@
     const st = $("stGd");
     if (st) { st.classList.toggle("ok", !!id && !pending); st.querySelector(".st-val").textContent = !id ? "Off" : pending ? pending + " to back up" : "✓ Up to date"; }
     $("gdButtons").classList.toggle("hidden", !id);
+    if ($("gdToggle")) $("gdToggle").textContent = id ? "Options" : "Set up";
     $("gdBackup").disabled = $("gdRestore").disabled = busy;
     $("gdAudio").checked = audioOn();
     const at = Number(ls.get("mia-backup-at"));

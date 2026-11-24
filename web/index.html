@@ -325,7 +325,26 @@
     .status-list li.ok .st-dot{background:var(--mint)}
     .status-list li.need .st-dot{background:var(--coral)}
     .st-val{font-size:13px;white-space:nowrap}
-    .set-more{border:var(--line);border-radius:22px;padding:4px 12px;margin:10px 0;background:var(--cream)}
+    .set-card{background:#fff;border:var(--line);border-radius:22px;overflow:hidden;margin-bottom:16px}
+    .set-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:var(--line)}
+    .set-row:first-child{border-top:0}
+    .set-row.col{flex-direction:column;align-items:stretch;gap:10px}
+    .set-row-in{display:flex;align-items:center;gap:12px}
+    .set-label{flex:1;display:flex;flex-direction:column;min-width:0}
+    .set-label small{font-size:12px;color:var(--muted);font-weight:700}
+    .set-input{width:100%;box-sizing:border-box;padding:10px 14px;font:inherit;font-size:16px;font-weight:700;border:var(--line);border-radius:14px;background:var(--cream);color:var(--ink)}
+    .row-btn{flex:none;min-height:38px;padding:0 14px;border:var(--line);border-radius:999px;background:var(--cream);font:inherit;font-weight:800;font-size:14px;color:var(--ink)}
+    .row-edit{display:flex;flex-direction:column;gap:8px}
+    .key-row{display:flex;gap:8px;padding:6px 6px 6px 12px;border:var(--line);border-radius:14px;background:var(--cream)}
+    .key-row input{flex:1;min-width:0;font:inherit;font-size:16px;font-weight:700;border:0;background:transparent;color:var(--ink)}
+    .key-row button{min-height:36px;padding:0 14px;border:0;border-radius:999px;background:var(--ink);color:#fff;font:inherit;font-weight:800}
+    .row-actions{display:flex;gap:8px}
+    .row-actions .row-btn{flex:1}
+    .row-link{font-size:13px;font-weight:800;color:var(--coral)}
+    .row-check{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700;color:var(--muted)}
+    .row-note{font-size:12px;color:var(--muted);margin:0}
+    .set-note.small{font-size:11px}
+    .set-more{border:var(--line);border-radius:22px;padding:4px 12px;margin:0 0 16px;background:var(--cream)}
     .set-more summary{cursor:pointer;font-weight:800;padding:10px 2px;list-style:none}
     .set-more summary::-webkit-details-marker{display:none}
     .set-more summary::after{content:" ▾"}
@@ -418,7 +437,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.15.2</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.15.3</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -492,7 +511,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.15.2</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.15.3</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -613,58 +632,55 @@
    <ul class="status-list">
     <li id="stGroq"><span class="st-dot" aria-hidden="true"></span><span><strong>Speech &amp; reports</strong><small>Groq · free · needed</small></span><b class="st-val">…</b></li>
     <li id="stTy"><span class="st-dot" aria-hidden="true"></span><span><strong>Thai accuracy boost</strong><small>Typhoon · free · recommended</small></span><b class="st-val">…</b></li>
-    <li id="stGd"><span class="st-dot" aria-hidden="true"></span><span><strong>Backup</strong><small>Your Google Drive · free · optional</small></span><b class="st-val">…</b></li>
+    <li id="stGd"><span class="st-dot" aria-hidden="true"></span><span><strong>Backup</strong><small>Google Drive · free · optional</small></span><b class="st-val">…</b></li>
    </ul>
-   <p class="set-note">Green means done. You don't need to set anything else.</p>
+   <p class="set-note">Green means ready. Nothing else is needed.</p>
 
-   <h3 class="set-h">Your preferences</h3>
-   <section class="lang-row">
-    <span class="lang-text"><strong>Report language</strong><span>Recordings can be Thai, English or both</span></span>
-    <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
+   <h3 class="set-h">Report</h3>
+   <div class="set-card">
+    <div class="set-row"><span class="set-label"><strong>Language</strong><small>Recordings can be Thai, English or both</small></span>
+     <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
     <button type="button" data-out="th" aria-pressed="true">Thai</button>
     <button type="button" data-out="en" aria-pressed="false">English</button>
    </div>
-   </section>
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="agentTerms"><strong>Names &amp; terms</strong><span>Helps spell people, projects and jargon right</span></label>
-   </section>
-   <input class="terms-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off">
+    </div>
+    <div class="set-row col"><label class="set-label" for="agentTerms"><strong>Names &amp; terms</strong><small>Helps MIA spell people, projects and jargon right</small></label>
+     <input class="set-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off"></div>
+   </div>
+
+   <h3 class="set-h">Connections</h3>
+   <div class="set-card">
+    <div class="set-row"><span class="set-label"><strong>Groq</strong><small>Speech-to-text and reports · free · <span id="svcState">Not set up</span></small></span>
+     <button class="row-btn" id="svcButton" type="button">Set up</button></div>
+    <div class="set-row col"><div class="set-row-in"><span class="set-label"><strong>Typhoon</strong><small>Thai accuracy boost · free · <b id="tyState">Off</b></small></span>
+     <button class="row-btn" id="tyToggle" type="button" aria-expanded="false" aria-controls="tyEdit">Change key</button></div>
+     <div class="row-edit hidden" id="tyEdit">
+      <div class="key-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon key"><button id="tySave" type="button">Save</button></div>
+      <a class="row-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
+     </div></div>
+   </div>
+
+   <h3 class="set-h">Backup</h3>
+   <div class="set-card">
+    <div class="set-row col"><div class="set-row-in"><span class="set-label"><strong>Google Drive</strong><small>Keeps reports safe if this iPhone's storage is cleared · <b id="gdState">Off</b></small></span>
+     <button class="row-btn" id="gdToggle" type="button" aria-expanded="false" aria-controls="gdEdit">Set up</button></div>
+     <div class="row-edit hidden" id="gdEdit">
+      <div class="key-row"><input id="gdClient" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Google Client ID"><button id="gdSave" type="button">Save</button></div>
+      <div class="row-actions hidden" id="gdButtons"><button class="row-btn" id="gdBackup" type="button">Back up now</button><button class="row-btn" id="gdRestore" type="button">Restore</button></div>
+      <label class="row-check"><input type="checkbox" id="gdAudio"> Also back up audio (uses more Drive space)</label>
+      <p class="row-note" id="gdNote"></p>
+     </div></div>
+    <div class="set-row"><span class="set-label"><small id="storeNote">Storage on this iPhone</small></span></div>
+   </div>
 
    <details class="set-more">
-    <summary>Connect or change keys</summary>
-   <section class="svc" id="svcCard">
-    <span class="svc-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 5 14h6l-1 7 8-11h-6Z"/></svg></span>
-    <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
-    <button class="svc-btn" id="svcButton" type="button">Set up · free</button>
-   </section>
-   <button class="link-btn settings-link hidden" id="svcLink" type="button">Change Groq key</button>
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="tyKey"><strong>Typhoon key</strong><span>Free · from SCB 10X (Thai AI company) · <b id="tyState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon key here"><button id="tySave" type="button">Save</button></div>
-   <a class="link-btn settings-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
-   </details>
-
-   <details class="set-more">
-    <summary>Backup to Google Drive · optional</summary>
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="gdClient"><strong>Google Client ID</strong><span>Free · <b id="gdState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="gdClient" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Google Client ID"><button id="gdSave" type="button">Save</button></div>
-   <div class="export-row hidden" id="gdButtons"><button class="btn" id="gdBackup" type="button">Back up now</button><button class="btn" id="gdRestore" type="button">Restore</button></div>
-   <label class="set-note gd-audio"><input type="checkbox" id="gdAudio"> Also back up audio (uses more Drive space)</label>
-   <p class="set-note" id="gdNote"></p>
-   </details>
-   <p class="set-note" id="storeNote"></p>
-
-   <details class="set-more">
-    <summary>Advanced · paid, optional (not needed)</summary>
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="oaKey"><strong>OpenAI key</strong><span>Paid, about 10 THB per hour · <b id="oaState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="oaKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste OpenAI key (sk-…)"><button id="oaSave" type="button">Save</button></div>
-   <p class="set-note">You don't need this. MIA works fully for free without it. To turn it off, clear the box and tap Save.</p>
-   <label class="set-note gd-audio hidden" id="oaBrainRow"><input type="checkbox" id="oaBrain"> Also let OpenAI write the reports · ChatGPT-level, about 3-5 THB per report</label>
+    <summary>Advanced · paid · not needed</summary>
+    <div class="set-card">
+     <div class="set-row col"><span class="set-label"><strong>OpenAI key</strong><small>Paid, about 10 THB per hour · <b id="oaState">Off</b></small></span>
+      <div class="key-row"><input id="oaKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste OpenAI key (sk-…)"><button id="oaSave" type="button">Save</button></div>
+      <label class="row-check hidden" id="oaBrainRow"><input type="checkbox" id="oaBrain"> Also let OpenAI write the reports · about 3-5 THB each</label>
+      <p class="row-note">MIA works fully for free without this. To turn it off, clear the box and tap Save.</p></div>
+    </div>
    </details>
 
   <details class="limits">
@@ -679,15 +695,18 @@
         <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
       <li><span class="tip-icon" style="background:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
         <div><strong>Keep a backup</strong><span>iOS can clear browser storage. For an important meeting, tap Export → Save to Files as a backup copy.</span></div></li>
+      <li><span class="tip-icon" style="background:var(--sky)">?</span>
+        <div><strong>Stop the mic question</strong><span>On iPhone open Settings → Apps → Safari → Microphone → Allow.</span></div></li>
+      <li><span class="tip-icon" style="background:var(--peach)">?</span>
+        <div><strong>Online meeting</strong><span>Place your iPhone near the laptop speaker. MIA records the room sound.</span></div></li>
     </ul>
   </details>
-   <p class="set-note"><strong>Stop the mic question?</strong> On iPhone open Settings → Apps → Safari → Microphone → Allow. Safari then stops asking each time.</p>
-   <p class="set-note"><strong>Online meeting?</strong> Place your iPhone near the laptop speaker. MIA records the room sound.</p>
-   <p class="set-note" id="modelNote"></p>
+   <span class="hidden" id="svcCard"></span><button class="hidden" id="svcLink" type="button" tabindex="-1" aria-hidden="true"></button>
+   <p class="set-note small" id="modelNote"></p>
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.15.2</p>
+    <p>MIA prototype · v0.15.3</p>
   </div>
    </div>
   </dialog>
