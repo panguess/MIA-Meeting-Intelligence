@@ -380,6 +380,11 @@
       #printArea table{border-collapse:collapse;width:100%}
       #printArea td,#printArea th{border:1px solid #999;padding:4px 6px;text-align:left}
     }
+    .live-box{background:#fff;border:2px dashed var(--ink);border-radius:20px;padding:10px 14px;margin:0 0 12px}
+    .live-label{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--muted)}
+    .live-label i{width:8px;height:8px;border-radius:50%;background:var(--coral)}
+    #liveText{margin:4px 0 0;font-size:15px;font-weight:700;line-height:1.5;max-height:4.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+    .improve{display:block;margin:4px auto 12px}
   </style>
 </head>
 <body>
@@ -387,7 +392,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.11.2</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.12.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -413,6 +418,8 @@
     </div>
     <div class="notice" id="warning" role="alert"></div>
   </section>
+
+  <div class="live-box hidden" id="liveBox" aria-live="polite"><span class="live-label"><i></i>Live text</span><p id="liveText"></p></div>
 
   <div class="title-block">
     <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" aria-label="Meeting title" placeholder="Meeting title (optional)">
@@ -459,7 +466,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.11.2</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.12.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -551,6 +558,7 @@
       </div>
       <div class="m-stats" id="mStats"><div class="sun"><b id="statDecisions">0</b><span>Decisions</span></div><div class="lilac"><b id="statActions">0</b><span>Actions</span></div><div class="peach"><b id="statRisks">0</b><span>Risks</span></div></div>
       <div class="paper minutes" id="minutesBody"></div>
+      <button class="link-btn improve hidden" id="improveBtn" type="button">Improve accuracy · re-listen to the audio</button>
       <div class="export-row"><button class="btn" id="exportWord" type="button">Save as Word</button><button class="btn" id="exportPdf" type="button">Save as PDF</button></div>
       <div class="refine">
        <button class="btn" id="refineClaude" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8Z"/></svg>Refine with Claude</button>
@@ -612,7 +620,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.11.2</p>
+    <p>MIA prototype · v0.12.0</p>
   </div>
    </div>
   </dialog>

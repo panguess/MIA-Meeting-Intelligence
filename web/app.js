@@ -557,6 +557,7 @@
       state.recordingId = crypto.randomUUID();
       state.marks = [];
       updateMarkLabel();
+      liveStart();
 
       const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
         || t("meetingWord") + " " + formatDate(state.startedAt);
@@ -605,6 +606,7 @@
         const wasPossiblyInterrupted = state.pendingWarning;
         const stoppedByUser = state.userStopped;
         const marks = (state.marks || []).slice();
+        const liveText = liveStop();
         await state.chunkWriteQueue;
         const rows = recordingId ? await getChunks(recordingId) : [];
         const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -646,7 +648,8 @@
           blob,
           size: blob.size,
           incomplete: wasPossiblyInterrupted,
-          marks
+          marks,
+          live: liveText
         };
 
         try {
@@ -657,7 +660,7 @@
           // the Agent then gets this first part only when they tap Minutes.
           const handOff = (stay = false) => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
-            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay }))
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText }))
               .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
           };
           if (!stoppedByUser) {
@@ -694,6 +697,69 @@
         showWarning((error?.message || t("micUnsupported")));
       }
     }
+  }
+
+  // ---------- Live text (like phone dictation) ----------
+  // Safari's speech recognition turns speech into text while recording, so the
+  // minutes can be written right after Stop without uploading the audio. iOS
+  // ends each recognition session after a short while or a pause, so it is
+  // restarted for as long as the recording runs. The audio is still recorded
+  // as a backup ("Improve accuracy" re-listens to it).
+  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const live = { rec: null, on: false, lines: [], interim: "", failed: "" };
+  function liveRender() {
+    const box = el("liveBox");
+    if (!box) return;
+    box.classList.toggle("hidden", !live.on && !live.lines.length);
+    const last = live.lines.slice(-3).map(l => l.text).join(" ");
+    el("liveText").textContent = (last + (live.interim ? " " + live.interim : "")).trim() || (live.failed || "Listening…");
+  }
+  function liveStart() {
+    live.lines = []; live.interim = ""; live.failed = "";
+    if (!Speech) return;
+    live.on = true;
+    const run = () => {
+      if (!live.on) return;
+      const r = new Speech();
+      r.lang = "th-TH"; r.continuous = true; r.interimResults = true;
+      r.onresult = e => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i], text = (res[0] && res[0].transcript || "").trim();
+          if (!text) continue;
+          if (res.isFinal) live.lines.push({ at: Math.round(elapsedSeconds()), text });
+          else interim += " " + text;
+        }
+        live.interim = interim.trim();
+        liveRender();
+      };
+      r.onerror = e => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+          live.on = false; live.failed = "Live text isn't available here. The recording continues.";
+          liveRender();
+        }
+      };
+      r.onend = () => { if (live.on) setTimeout(() => { if (live.on && !state.pausedAt) run(); }, 250); };
+      live.rec = r;
+      try { r.start(); } catch { live.on = false; }
+    };
+    run();
+    liveRender();
+  }
+  function livePause(paused) {
+    if (!live.on && !live.rec) return;
+    if (paused) { try { live.rec && live.rec.stop(); } catch {} }
+    else if (live.on) { try { live.rec && live.rec.start(); } catch {} }
+  }
+  function liveStop() {
+    live.on = false;
+    if (live.interim) { live.lines.push({ at: Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
+    try { live.rec && live.rec.stop(); } catch {}
+    live.rec = null;
+    const fmt = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    const text = live.lines.map(l => "[" + fmt(l.at) + "] " + l.text).join("\n");
+    liveRender();
+    return text;
   }
 
   // Bookmarks: the user taps Mark when something important is said. The
@@ -734,11 +800,13 @@
       if (recorder.state === "recording") {
         recorder.pause();
         state.pausedAt = Date.now();
+        livePause(true);
         setStatus(t("paused"), true);
       } else if (recorder.state === "paused") {
         recorder.resume();
         state.pausedTotal += Date.now() - (state.pausedAt || Date.now());
         state.pausedAt = null;
+        livePause(false);
         setStatus(t("recordingStarted"), true);
       }
       updateTimer();
@@ -818,7 +886,7 @@
     try {
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noAudio"));
-      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [] });
+      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [], live: record.live || "" });
     } catch (error) {
       showWarning(error?.message || t("noAudio"));
     }

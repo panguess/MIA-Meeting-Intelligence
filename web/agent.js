@@ -390,6 +390,7 @@
         for (const x of $("jobKind").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.kind === kind));
         $("kindNote").textContent = job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected";
         $("mStats").classList.toggle("hidden", kind === "talk");
+        $("improveBtn").classList.toggle("hidden", job.source !== "live" || !job.audio);
         const out = job.outLang || (job.lang === "en" ? "en" : "th");
         for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
       }
@@ -738,6 +739,12 @@
     return addAudio(file, name, {});
   }
 
+  // Live text from the phone: the minutes can be written straight away.
+  function liveFields(opts) {
+    const t = opts.live || "";
+    return t.replace(/\[[\d:]+\]\s*/g, "").trim().length > 40 ? { transcript: t, transcriptComplete: true, source: "live" } : {};
+  }
+
   // Used by the Agent tab and by the Record tab (after Stop, or "Minutes").
   async function addAudio(blob, name, opts) {
     opts = opts || {};
@@ -754,7 +761,7 @@
         marks: opts.marks || [],
         audio: blob, audioType: blob.type, size: blob.size,
         duration: opts.duration || await audioDuration(blob),
-        status: "queued", progress: 0, transcript: "", minutes: "", parts: []
+        status: "queued", progress: 0, transcript: "", minutes: "", parts: [], ...liveFields(opts)
       };
       await saveJob(job);
       state.jobs.push(job);
@@ -905,6 +912,15 @@
       render(); window.scrollTo({ top: 0 });
     });
     $("detailBack").addEventListener("click", () => { state.openId = null; render(); });
+    $("improveBtn").addEventListener("click", async () => {
+      const job = state.jobs.find(j => j.id === state.openId);
+      if (!job || job.status === "working" || !job.audio) return;
+      job.liveTranscript = job.liveTranscript || job.transcript;
+      job.source = "audio"; job.status = "queued"; job.progress = 0; job.transcript = ""; job.transcriptComplete = false; job.parts = []; job.minutes = "";
+      state.tab = "transcript";
+      await saveJob(job); render();
+      processJob(job);
+    });
     const openJob = () => state.jobs.find(j => j.id === state.openId && j.minutes);
     $("exportWord").addEventListener("click", () => { const j = openJob(); if (j) exportWord(j); });
     $("exportPdf").addEventListener("click", () => { const j = openJob(); if (j) exportPdf(j); });
