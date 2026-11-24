@@ -39,6 +39,9 @@
     groqStt: { def: "whisper-large-v3", rules: [/^whisper-large-v\d+$/i, /^whisper-large/i] },
     groqLlm: { def: "openai/gpt-oss-120b", rules: [/^openai\/gpt-oss.*-120b$/i, /^openai\/gpt-oss/i] },
     typhoon: { def: "typhoon-asr-realtime", rules: [/^typhoon.*asr(?!.*realtime)/i, /^typhoon.*asr/i] },
+    // Report brain when the user turns on "OpenAI for reports": newest
+    // flagship GPT (never -pro, which is far more expensive).
+    openaiLlm: { def: "gpt-5", rules: [/^gpt-\d+(\.\d+)?$/i, /^gpt-\d+(\.\d+)?-chat-latest$/i] },
     openai: { def: "gpt-transcribe", rules: [/^gpt-transcribe$/i, /^gpt-[\w.]*transcribe$/i, /^gpt-4o-transcribe$/i] }
   };
   // Size tags like -120b or -20b are not versions, so they are ignored.
@@ -69,7 +72,7 @@
     const tasks = [];
     if (getKey()) tasks.push(listIds(GROQ + "/models", getKey()).then(ids => { if (ids) { models.groqStt = pickModel("groqStt", ids); models.groqLlm = pickModel("groqLlm", ids); } }));
     if (getTyphoonKey()) tasks.push(listIds(TYPHOON + "/models", getTyphoonKey()).then(ids => { if (ids && ids.length) models.typhoon = pickModel("typhoon", ids); }));
-    if (getOpenAIKey()) tasks.push(listIds(OPENAI + "/models", getOpenAIKey()).then(ids => { if (ids && ids.length) models.openai = pickModel("openai", ids); }));
+    if (getOpenAIKey()) tasks.push(listIds(OPENAI + "/models", getOpenAIKey()).then(ids => { if (ids && ids.length) { models.openai = pickModel("openai", ids); models.openaiLlm = pickModel("openaiLlm", ids); } }));
     await Promise.all(tasks);
     models.at = Date.now();
     try { localStorage.setItem("mia-models", JSON.stringify(models)); } catch {}
@@ -81,6 +84,7 @@
     const parts = ["Speech: " + useModel("groqStt"), "Minutes: " + useModel("groqLlm")];
     if (getTyphoonKey()) parts.push("Typhoon: " + useModel("typhoon"));
     if (getOpenAIKey()) parts.push("OpenAI: " + useModel("openai"));
+    if (getOpenAIKey() && brainOn()) parts.push("Reports: " + useModel("openaiLlm"));
     el.textContent = "Models in use (updated automatically): " + parts.join(" · ");
   }
   const PART_SECONDS = 300;
@@ -742,9 +746,40 @@
     return text;
   }
 
+  // Optional paid brain: the user's own OpenAI key writes the report in one
+  // pass from the full transcript. Any failure falls back to the free brain.
+  const BRAIN_KEY = "mia-openai-brain";
+  const brainOn = () => { try { return localStorage.getItem(BRAIN_KEY) === "1"; } catch { return false; } };
+  async function openaiChat(system, user, model) {
+    model = model || useModel("openaiLlm");
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 300000);
+    let res;
+    try {
+      res = await fetch(OPENAI + "/chat/completions", {
+        method: "POST", signal: ctl.signal,
+        headers: { Authorization: "Bearer " + getOpenAIKey(), "Content-Type": "application/json" },
+        body: JSON.stringify({ model, messages: [{ role: "system", content: system }, { role: "user", content: user }], max_completion_tokens: 16000, reasoning_effort: "medium" })
+      });
+    } finally { clearTimeout(t); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (data.error && data.error.message) || "error " + res.status;
+      if ((res.status === 400 || res.status === 404) && /model/i.test(msg) && model !== MODEL_PREFS.openaiLlm.def) { dropModel("openaiLlm"); return openaiChat(system, user, MODEL_PREFS.openaiLlm.def); }
+      throw new Error(msg);
+    }
+    const out = ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
+    if (!out) throw new Error("empty answer");
+    return out;
+  }
+
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
     const prompt = finalPrompt(job);
+    if (getOpenAIKey() && brainOn() && transcript.length < 600000) {
+      try { const r = takeType(job, await openaiChat(prompt, "Transcript:\n" + transcript)); job.brain = "openai"; return r; }
+      catch (e) { toast("OpenAI couldn't write the report (" + (e && e.message || "error") + "). Using the free brain."); }
+    }
+    job.brain = "groq";
     if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 4000, "medium"));
     let notes;
     if ((job.parts || []).some(p => p && p.notes)) {
@@ -1152,12 +1187,18 @@
       render();
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
-    const oaState = () => { $("oaState").textContent = getOpenAIKey() ? "On" : "Off"; };
+    const oaState = () => { $("oaState").textContent = getOpenAIKey() ? "On" : "Off"; $("oaBrain").checked = brainOn(); $("oaBrainRow").classList.toggle("hidden", !getOpenAIKey()); };
+    $("oaBrain").addEventListener("change", e => {
+      try { e.target.checked ? localStorage.setItem(BRAIN_KEY, "1") : localStorage.removeItem(BRAIN_KEY); } catch {}
+      if (e.target.checked) refreshModels(true);
+      renderModels();
+      toast(e.target.checked ? "OpenAI now writes the reports (about 3-5 THB each)." : "Reports use the free brain.");
+    });
     oaState();
     $("oaSave").addEventListener("click", () => {
       const v = $("oaKey").value.trim();
       try { if (v) localStorage.setItem(OPENAI_KEY, v); else localStorage.removeItem(OPENAI_KEY); } catch {}
-      $("oaKey").value = ""; oaState(); refreshModels(true);
+      $("oaKey").value = ""; oaState(); refreshModels(true); renderModels();
       toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
     });
     const tyState = () => { $("tyState").textContent = getTyphoonKey() ? "On" : "Off"; };
