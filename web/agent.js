@@ -248,7 +248,7 @@
     const section = name => {
       const m = String(md).split(/\n(?=#{1,4}\s)/).find(s => new RegExp("^#{1,4}\\s*" + name, "i").test(s.trim()));
       if (!m) return 0;
-      const rows = m.split("\n").filter(l => /^\s*[-*•]\s+/.test(l)).length;
+      const rows = m.split("\n").filter(l => /^\s*[-*•]\s+/.test(l) && !isNone(clean(l.replace(/^\s*[-*•]\s+/, "")))).length;
       const trs = m.split("\n").filter(l => /^\s*\|/.test(l) && !/^\s*\|?\s*:?-{2,}/.test(l)).length;
       return rows + Math.max(0, trs - 1);
     };
@@ -591,6 +591,15 @@
   }
 
   let running = null;
+  // Like a chat app: Record -> Stop -> the summary appears by itself.
+  function showResult(job) {
+    if (state.openId === job.id) {
+      state.tab = "minutes";
+      if (document.body.dataset.view === "agent") window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    toast("Minutes ready");
+  }
+
   async function processJob(job) {
     if (running) {
       if (job.status !== "queued") { job.status = "queued"; await saveJob(job); render(); }
@@ -608,7 +617,7 @@
         job.minutes = await writeMinutes(job);
         job.status = "done"; job.progress = 100; job.stage = "";
         await saveJob(job);
-        toast("Minutes ready");
+        showResult(job);
         return;
       }
       const split = await splitAudio(job.audio);
@@ -670,7 +679,7 @@
       job.minutes = await writeMinutes(job);
       job.status = "done"; job.progress = 100; job.stage = "";
       await saveJob(job);
-      toast("Minutes ready");
+      showResult(job);
     } catch (e) {
       job.status = "error"; job.stage = "";
       job.error = e && e.message ? e.message : "Something went wrong.";
