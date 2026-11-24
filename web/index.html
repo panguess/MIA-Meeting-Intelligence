@@ -350,6 +350,24 @@
     .ty-row{display:flex;gap:8px;margin:0 0 8px;padding:10px;border:var(--line);border-radius:0 0 22px 22px;background:var(--cream)}
     .ty-row input{flex:1;min-width:0;font:inherit;font-size:16px;font-weight:700;border:0;background:transparent;color:var(--ink)}
     .ty-row button{border:var(--line);border-radius:999px;background:var(--ink);color:#fff;font-weight:800;padding:8px 16px}
+    .tracker-card{display:block;width:100%;text-align:left;background:#fff;border:var(--line);border-radius:24px;padding:14px 14px 12px;margin:0 0 22px;color:var(--ink);box-shadow:0 4px 0 var(--ink)}
+    .tc-title{display:block;font-family:var(--display);font-weight:600;font-size:19px;margin-bottom:10px}
+    .tc-title small{font-family:inherit;font-size:12px;font-weight:800;color:var(--muted);margin-left:4px}
+    .tc-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .tc-nums span{border:var(--line);border-radius:16px;padding:6px 10px;font-size:12px;font-weight:800}
+    .tc-nums b{display:block;font-family:var(--display);font-weight:600;font-size:24px;line-height:1.1}
+    #trackerSearch{margin-bottom:10px}
+    .t-toggle{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--muted);margin:0 4px 12px}
+    .t-list{display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
+    .t-item{display:flex;gap:12px;align-items:flex-start;background:#fff;border:var(--line);border-radius:20px;padding:12px 14px}
+    .t-item.done{opacity:.55}.t-item.done .t-text{text-decoration:line-through}
+    .t-check{width:28px;height:28px;flex:none;border-radius:50%;border:var(--line);background:#fff;display:grid;place-items:center;font-weight:800;padding:0;color:var(--ink)}
+    .t-item.done .t-check{background:var(--mint)}
+    .t-body{flex:1;min-width:0}
+    .t-text{display:block;font-weight:700;font-size:15px;overflow-wrap:anywhere}
+    .t-meta{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-top:3px}
+    .t-meta button{border:0;background:none;padding:0;font:inherit;color:var(--ink);text-decoration:underline}
+    .t-empty{text-align:center;color:var(--muted);font-weight:700;padding:24px 8px}
   </style>
 </head>
 <body>
@@ -357,7 +375,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.8.0</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.9.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -428,7 +446,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.8.0</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.9.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -449,12 +467,30 @@
 
 
 
+   <button class="tracker-card" id="trackerOpen" type="button">
+    <span class="tc-title">Tracker <small>across all meetings</small></span>
+    <span class="tc-nums"><span class="sun"><b id="tcActions">0</b>Open actions</span><span class="lilac"><b id="tcDecisions">0</b>Decisions</span><span class="peach"><b id="tcRisks">0</b>Risks</span></span>
+   </button>
+
    <section class="plain" aria-labelledby="jobsTitle">
     <div class="section-head"><h2 id="jobsTitle">My jobs</h2><span class="count" id="agentJobCount">0</span></div>
     <div class="jobs" id="agentJobs"></div>
    </section>
 
 
+  </div>
+
+  <div id="agentTracker" class="hidden">
+   <header class="top t-head">
+    <button class="round" id="trackerBack" type="button" aria-label="Back"><svg width="10" height="16" viewBox="0 0 10 17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 1.5 1.5 8.5l7 7"/></svg></button>
+    <div class="top-text"><h1>Tracker</h1><p>Across all your meetings</p></div>
+   </header>
+   <div class="seg" id="trackerSeg" role="group" aria-label="Show">
+    <button type="button" data-kind="actions" aria-pressed="true">Actions</button><button type="button" data-kind="decisions" aria-pressed="false">Decisions</button><button type="button" data-kind="risks" aria-pressed="false">Risks</button>
+   </div>
+   <input class="field" id="trackerSearch" type="search" placeholder="Search" aria-label="Search tracker" autocomplete="off">
+   <label class="t-toggle" id="trackerDoneWrap"><input type="checkbox" id="trackerShowDone"> Show done</label>
+   <div class="t-list" id="trackerList"></div>
   </div>
 
   <div id="agentDetail" class="hidden">
@@ -557,11 +593,12 @@
         <div><strong>Keep a backup</strong><span>iOS can clear browser storage. For an important meeting, tap Export → Save to Files as a backup copy.</span></div></li>
     </ul>
   </details>
+   <p class="set-note"><strong>Stop the mic question?</strong> On iPhone open Settings → Apps → Safari → Microphone → Allow. Safari then stops asking each time.</p>
    <p class="set-note"><strong>Online meeting?</strong> Place your iPhone near the laptop speaker. MIA records the room sound.</p>
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.8.0</p>
+    <p>MIA prototype · v0.9.0</p>
   </div>
    </div>
   </dialog>

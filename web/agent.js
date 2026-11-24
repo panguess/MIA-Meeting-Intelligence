@@ -240,6 +240,55 @@
     return { decisions: section("Decisions"), actions: section("Action"), risks: section("Risk") };
   }
 
+  // ---------- Tracker: action items, decisions and risks across meetings ----------
+  const clean = t => String(t || "").replace(/\*\*|__|`/g, "").replace(/\s+/g, " ").trim();
+  const isNone = t => !t || /^(none|n\/a|-|ไม่มี|—)\.?$/i.test(t);
+  function sectionOf(md, name) {
+    return String(md || "").split(/\n(?=#{1,4}\s)/).find(x => new RegExp("^#{1,4}\\s*" + name, "i").test(x.trim())) || "";
+  }
+  function trackerItems() {
+    const out = { actions: [], decisions: [], risks: [] };
+    for (const job of state.jobs) {
+      if (!job.minutes) continue;
+      const done = new Set(job.doneItems || []);
+      const add = (kind, i, text, extra) => { if (!isNone(text)) out[kind].push(Object.assign({ id: kind + ":" + i, job, text, done: done.has(kind + ":" + i) }, extra || {})); };
+      const bullets = sec => sec.split("\n").filter(l => /^\s*[-*•]\s+/.test(l)).map(l => clean(l.replace(/^\s*[-*•]\s+/, "")));
+      const act = sectionOf(job.minutes, "Action");
+      const rows = act.split("\n").filter(l => /^\s*\|/.test(l) && !/^\s*\|?\s*:?-{2,}/.test(l)).slice(1);
+      rows.forEach((r, i) => { const c = r.split("|").slice(1, -1).map(clean); add("actions", i, c[0], { owner: c[1] || "", due: c[2] || "" }); });
+      bullets(act).forEach((t, i) => add("actions", "b" + i, t));
+      bullets(sectionOf(job.minutes, "Decision")).forEach((t, i) => add("decisions", i, t));
+      bullets(sectionOf(job.minutes, "Risk")).forEach((t, i) => add("risks", i, t));
+    }
+    for (const k in out) out[k].sort((a, b) => b.job.createdAt - a.job.createdAt);
+    return out;
+  }
+  function renderTracker() {
+    const items = trackerItems();
+    $("tcActions").textContent = items.actions.filter(x => !x.done).length;
+    $("tcDecisions").textContent = items.decisions.length;
+    $("tcRisks").textContent = items.risks.filter(x => !x.done).length;
+    $("trackerOpen").classList.toggle("hidden", !state.jobs.some(j => j.minutes));
+    const on = !!state.tracker && !state.openId;
+    $("agentTracker").classList.toggle("hidden", !on);
+    if (!on) return;
+    $("agentHome").classList.add("hidden");
+    const kind = state.trackerKind || "actions";
+    for (const b of $("trackerSeg").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.kind === kind));
+    $("trackerDoneWrap").classList.toggle("hidden", kind === "decisions");
+    const q = $("trackerSearch").value.trim().toLowerCase();
+    const showDone = $("trackerShowDone").checked;
+    const list = items[kind].filter(x => (kind === "decisions" || showDone || !x.done) &&
+      (!q || (x.text + " " + (x.owner || "") + " " + x.job.name).toLowerCase().includes(q)));
+    $("trackerList").innerHTML = list.length ? list.map(x => {
+      const meta = [x.owner && "Owner: " + x.owner, x.due && "Due: " + x.due].filter(Boolean).join(" · ");
+      return '<div class="t-item' + (x.done ? " done" : "") + '">' +
+        (kind === "decisions" ? "" : '<button class="t-check" type="button" data-done="' + esc(x.job.id) + "|" + esc(x.id) + '" aria-label="Mark done" aria-pressed="' + x.done + '">' + (x.done ? "✓" : "") + "</button>") +
+        '<span class="t-body"><span class="t-text">' + esc(x.text) + "</span>" +
+        '<span class="t-meta">' + (meta ? esc(meta) + " · " : "") + '<button type="button" data-open="' + esc(x.job.id) + '">' + esc(x.job.name) + "</button> · " + esc(fmtDate(x.job.createdAt)) + "</span></span></div>";
+    }).join("") : '<div class="t-empty">' + (q ? "Nothing matches." : kind === "actions" ? "No open action items. Nice." : "Nothing here yet. It fills in as minutes are written.") + "</div>";
+  }
+
   function renderDetail() {
     const job = state.jobs.find(j => j.id === state.openId);
     const view = $("agentDetail");
@@ -653,7 +702,7 @@
     if (waiting) processJob(waiting);
   }
 
-  function render() { renderList(); renderDetail(); renderService(); }
+  function render() { renderList(); renderDetail(); renderTracker(); renderService(); }
 
   // ---------- actions ----------
   async function addFile(file) {
@@ -798,6 +847,25 @@
       render(); window.scrollTo({ top: 0 });
     });
     $("detailBack").addEventListener("click", () => { state.openId = null; render(); });
+    $("trackerOpen").addEventListener("click", () => { state.tracker = true; render(); window.scrollTo({ top: 0 }); });
+    $("trackerBack").addEventListener("click", () => { state.tracker = false; render(); });
+    $("trackerSeg").addEventListener("click", e => { const b = e.target.closest("button[data-kind]"); if (b) { state.trackerKind = b.dataset.kind; renderTracker(); } });
+    $("trackerSearch").addEventListener("input", renderTracker);
+    $("trackerShowDone").addEventListener("change", renderTracker);
+    $("trackerList").addEventListener("click", async e => {
+      const o = e.target.closest("[data-open]");
+      if (o) { state.openId = o.dataset.open; state.tab = "minutes"; render(); window.scrollTo({ top: 0 }); return; }
+      const d = e.target.closest("[data-done]");
+      if (!d) return;
+      const [jobId, id] = d.dataset.done.split("|");
+      const job = state.jobs.find(j => j.id === jobId);
+      if (!job) return;
+      const set = new Set(job.doneItems || []);
+      set.has(id) ? set.delete(id) : set.add(id);
+      job.doneItems = [...set];
+      await saveJob(job);
+      renderTracker();
+    });
     $("tabTranscript").addEventListener("click", () => { state.tab = "transcript"; renderDetail(); });
     $("tabMinutes").addEventListener("click", () => { state.tab = "minutes"; renderDetail(); });
     $("transcriptSearch").addEventListener("input", renderDetail);
