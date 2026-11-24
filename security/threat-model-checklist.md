@@ -1,34 +1,32 @@
-# MIA Threat Model Checklist
+# MIA threat-model checklist
 
-## Data protection
-- [ ] Private repository and restricted collaborators.
-- [ ] No secrets, meeting recordings, or transcripts committed to source control.
-- [ ] TLS in transit and encryption at rest.
-- [ ] Private object storage; public access disabled.
-- [ ] Managed secrets; no credentials in source code.
+## Assets
+- Original audio and imported recordings
+- Transcript and speaker-turn metadata
+- Minutes, decisions, action items, risk/issue logs
+- Encryption keys, authentication tokens, signed upload URLs
+- Audit and retention metadata
 
-## Access control
-- [ ] MFA enabled for maintainers.
-- [ ] Least-privilege roles.
-- [ ] Workspace and user authorization tested.
-- [ ] Administrative access audited.
+## Threats to assess
+- Lost or compromised iPhone
+- Malicious or compromised app/library dependency
+- Unauthorized backend/API access
+- Public or misconfigured object storage
+- Credential theft and session hijacking
+- Developer/support access to production content
+- Accidental external AI/API egress
+- Logs, crash reports, analytics, and backups leaking content
+- Retention job failure or incomplete deletion
+- Audio interruption or partial upload being mistaken for complete capture
 
-## Audio lifecycle
-- [ ] Recording interruptions and gaps surfaced to user.
-- [ ] File integrity checksum verified after recording/import.
-- [ ] 90-day audio retention enforced across copies and temporary storage.
-- [ ] Backup expiry and deletion semantics documented.
-- [ ] Transcript and derived-output retention policy defined.
-
-## AI processing
-- [ ] Local model license and provenance reviewed.
-- [ ] Telemetry and outbound network traffic assessed.
-- [ ] Cloud AI disabled by default.
-- [ ] Per-meeting user approval captured before any external transfer.
-- [ ] Provider DPA, retention, training, residency, subprocessors, and deletion reviewed.
-
-## Operational readiness
-- [ ] Storage exhaustion and app termination tested.
-- [ ] iOS calls, Siri, route changes, and app lifecycle interruptions tested.
-- [ ] Restore and incident response procedures documented.
-- [ ] Human approval required for final minutes and action items.
+## Mandatory mitigations before production
+- iPhone passcode and OS security assumptions documented
+- Keychain-protected keys and encrypted local files
+- MFA and least privilege
+- Private network/storage and object-level authorization
+- Egress deny-by-default
+- No sensitive payloads in logs or telemetry
+- Verifiable deletion lifecycle including backups
+- Audit trail for access, export, provider consent, approval, and deletion
+- Incident response and recovery tests
+- No real confidential meetings until all gates pass
