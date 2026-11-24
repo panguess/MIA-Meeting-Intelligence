@@ -91,6 +91,10 @@
       copied: "Copied",
       close: "Close",
       shareText: "Share",
+      summaryCopy: "Copy for summary",
+      summaryCopied: "Copied ✓",
+      summaryHint: "Copies the transcript with summary instructions. Paste it into Claude.",
+      openClaude: "Open Claude",
       dbError: "Couldn't open storage on this device"
     }
   };
@@ -880,6 +884,7 @@
       .filter(Boolean).join(" · ");
     el("transcriptText").textContent = record.transcript || "";
     el("transcriptText").scrollTop = 0;
+    el("openClaude").classList.remove("highlight");
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
   }
@@ -905,6 +910,54 @@
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
+    }
+  }
+
+  // Summaries are made by the user in their own Claude app (no API, no cost):
+  // MIA copies the transcript together with these instructions, and the user
+  // pastes it into Claude. MIA itself sends nothing anywhere.
+  function summaryPrompt(record) {
+    return [
+      "ช่วยสรุปการประชุมจาก transcript ด้านล่างเป็นภาษาไทย สำหรับส่งให้ผู้บริหารอ่าน",
+      "",
+      "ชื่อการประชุม: " + (record.title || record.fileName || "-"),
+      "",
+      "รูปแบบที่ต้องการ:",
+      "1. สรุปภาพรวม (3–5 บรรทัด)",
+      "2. ประเด็นสำคัญที่หารือ (bullet แยกตามหัวข้อ)",
+      "3. ข้อสรุป / การตัดสินใจ",
+      "4. Action items เป็นตาราง: งาน | ผู้รับผิดชอบ | กำหนดส่ง (ถ้าไม่มีใน transcript ให้ใส่ \"ไม่ระบุ\")",
+      "5. ประเด็นค้าง / คำถามที่ยังไม่มีคำตอบ",
+      "6. ความเสี่ยงหรือข้อกังวลที่มีการพูดถึง",
+      "",
+      "ข้อกำหนด:",
+      "- ใช้เฉพาะข้อมูลที่อยู่ใน transcript ห้ามเดาหรือเติมข้อมูลเอง",
+      "- transcript นี้ถอดเสียงด้วยเครื่อง ชื่อคน ตัวเลข และศัพท์เฉพาะอาจผิด ถ้าไม่แน่ใจให้ทำเครื่องหมาย [ตรวจสอบ]",
+      "- อ้างเวลา [ชม:นาที:วินาที] จาก transcript กำกับการตัดสินใจและ action item แต่ละข้อ",
+      "- กระชับ เป็นทางการ",
+      "",
+      "----- TRANSCRIPT -----",
+      record.transcript || ""
+    ].join("\n");
+  }
+
+  async function copyForSummary() {
+    const record = state.transcriptOpen && await getRecord(state.transcriptOpen);
+    if (!record?.transcript) return;
+    const text = summaryPrompt(record);
+    const label = el("summaryCopy").querySelector("span");
+    try {
+      await navigator.clipboard.writeText(text);
+      label.textContent = t("summaryCopied");
+      el("openClaude").classList.add("highlight");
+      window.setTimeout(() => { label.textContent = t("summaryCopy"); }, 4000);
+    } catch {
+      // Clipboard blocked: offer the iOS share sheet, where the Claude app can be picked directly.
+      try {
+        if (navigator.share) await navigator.share({ text });
+      } catch (error) {
+        if (error?.name !== "AbortError") showWarning(t("transcriptFailed") + ": " + (error?.message || ""));
+      }
     }
   }
 
@@ -1007,6 +1060,7 @@
     el("transcriptClose").addEventListener("click", closeTranscript);
     el("transcriptCopy").addEventListener("click", copyTranscript);
     el("transcriptShare").addEventListener("click", shareTranscript);
+    el("summaryCopy").addEventListener("click", copyForSummary);
     el("transcriptReplace").addEventListener("click", () => {
       const id = state.transcriptOpen;
       closeTranscript();

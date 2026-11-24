@@ -42,4 +42,6 @@ Implemented: live microphone recording, local IndexedDB storage, recovery of sav
 
 Transcripts are made on the user's own Windows laptop, not in the app: export the recording to `OneDrive › Desktop › MIA › Inbox`, the laptop transcriber writes `<name>.transcript.txt` back to that folder, then tap **Transcript** on the recording and pick that file. See [the laptop transcriber](../tools/transcriber/README.md).
 
-Not implemented: on-iPhone transcription, summaries, action items, cloud sync, remote processing, meeting-platform connection, guaranteed background recording, or a hosted production URL.
+Summaries: in the transcript viewer, **Copy for summary** copies the transcript with Thai summary instructions; paste it into the Claude app. MIA sends nothing itself.
+
+Not implemented: on-iPhone transcription, automatic summaries, action items, cloud sync, remote processing, meeting-platform connection, guaranteed background recording, or a hosted production URL.

@@ -1,14 +1,13 @@
-"""Summary hook (not implemented yet, on purpose).
+"""Summary hook (intentionally a no-op).
 
-How meeting summaries will be made is still being decided. The options under
-consideration are:
+Decision (24 Nov 2026): summaries are made by the user in their own Claude app
+with their existing subscription, not automatically. In the MIA app, the
+transcript viewer's "Copy for summary" button copies the transcript together
+with summary instructions, and the user pastes it into Claude. There is no API
+key and no automatic upload, so this hook does nothing.
 
-  * the user's existing Claude subscription (paste or attach the transcript), or
-  * a small summary model that runs on this laptop.
-
-Until that is decided this hook does nothing, so no transcript ever leaves the
-computer. When a method is chosen, implement it here and write the result next
-to the transcript, for example:
+If an automatic, local method is added later, implement it here and write the
+result next to the transcript, for example:
 
     MIA-2026-11-24T09-00-00-000Z.summary.txt
 

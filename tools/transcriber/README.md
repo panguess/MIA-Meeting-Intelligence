@@ -65,7 +65,7 @@ Options (add after `mia_transcriber.py` in `start_transcriber.bat`, or run from 
 
 ## Summaries
 
-Not implemented. `summary_hook.py` is called after each transcript and currently does nothing, so no text leaves the laptop. How summaries will be produced has not been decided.
+Made by the user in their own Claude app, at no extra cost: open the transcript in MIA, tap **Copy for summary** (copies the transcript plus Thai instructions for key points, decisions, action items with owner and due date, open questions and risks), then **Open Claude** and paste. Nothing is sent automatically. `summary_hook.py` stays a no-op placeholder for a possible future local method.
 
 ## Tests
 
