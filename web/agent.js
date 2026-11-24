@@ -66,9 +66,10 @@
   ].join("\n");
   const PART_PROMPT = [
     "You take notes from one part of a transcript of a meeting, presentation or lecture (Thai and/or English).",
-    "Write at most 12 short bullets in the transcript's language.",
-    "Prefix bullets: DECISION:, ACTION: (with owner and due date if said), RISK:, ISSUE:, or none for key points.",
-    "Keep names, numbers and dates exactly as said. Mark anything unclear with [verify].",
+    "The transcript is machine speech-to-text: ignore filler words and obvious recognition errors, infer the intended word from context.",
+    "Write at most 15 short, specific bullets in the transcript's language. Start each with the topic in brackets, e.g. [Budget].",
+    "Prefix bullets: DECISION:, ACTION: (task, owner, due date if said), RISK: (with impact if said), ISSUE:, or none for key points.",
+    "Keep names, numbers, amounts and dates exactly as said; note who said it when clear. Mark anything unclear with [verify].",
     "No introduction, no closing line."
   ].join("\n");
   const TALK_FORMAT = [
@@ -79,14 +80,18 @@
     "## Takeaways  (3-5 bullets)"
   ].join("\n");
   const FINAL_PROMPT = [
-    "You write meeting minutes for a risk management team, from the notes or transcript provided.",
+    "You are an experienced corporate secretary writing formal meeting minutes for the risk management team of a large Thai company.",
+    "The input is notes or a machine transcript (Thai with English terms): ignore filler and recognition errors, infer the intended meaning from context.",
     "Keep the section headings below in English, exactly:",
-    "## Overview  (2-3 sentences)",
-    "## Key points  (bullets)",
-    "## Decisions  (bullets; write - None if none)",
-    "## Action items  (Markdown table with columns: Task | Owner | Due date)",
-    "## Open issues  (bullets)",
-    "## Risks raised  (bullets)",
+    "## Overview  (2-3 sentences: purpose of the meeting, main outcome; attendees if mentioned)",
+    "## Key points  (group by agenda topic: ### Topic, then 2-5 specific bullets each; who said what when clear)",
+    "## Decisions  (bullets: the decision and, briefly, why; write - None if none)",
+    "## Action items  (Markdown table with columns: Task | Owner | Due date; one row per task, start each task with a verb)",
+    "## Open issues  (bullets: what is unresolved and what is needed; - None if none)",
+    "## Risks raised  (bullets: risk → possible impact → mitigation if discussed; - None if none)",
+    "Style: formal business language (Thai: ภาษาทางการ, concise), keep English business terms in English (e.g. KPI, audit, risk appetite).",
+    "Be specific: keep names, numbers, amounts and dates. Merge duplicates. No generic filler.",
+    "Before writing, check that every decision, action and risk in the input appears in the minutes.",
     "Use only facts from the input. If a name, number or date is unclear or missing, write [verify].",
     "Output only the Markdown. No introduction."
   ].join("\n");
@@ -538,13 +543,13 @@
     return segs.map(s => (s.text || "").trim() ? "[" + stamp(offset + (s.start || 0)) + "] " + s.text.trim() : "").filter(Boolean).join("\n");
   }
 
-  async function chat(system, user, maxTokens) {
+  async function chat(system, user, maxTokens, effort) {
     const data = await groq("/chat/completions", {
       model: LLM_MODEL,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       temperature: 0.2,
       max_completion_tokens: maxTokens,
-      reasoning_effort: "low"
+      reasoning_effort: effort || "low"
     });
     return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
   }
@@ -574,8 +579,19 @@
   async function writeMinutes(job) {
     const transcript = job.transcript || "";
     const prompt = finalPrompt(job);
-    if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 2500));
-    let notes = job.parts.map((p, i) => "Part " + (i + 1) + " (from " + stamp(i * PART_SECONDS) + "):\n" + (p.notes || ""));
+    if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 4000, "medium"));
+    let notes;
+    if ((job.parts || []).some(p => p && p.notes)) {
+      notes = job.parts.map((p, i) => "Part " + (i + 1) + " (from " + stamp(i * PART_SECONDS) + "):\n" + (p.notes || ""));
+    } else {
+      // Live text has no audio parts: take notes from ~6,000-character pieces.
+      const lines = transcript.split("\n"), pieces = [];
+      let cur = "";
+      for (const l of lines) { if (cur && (cur + l).length > 6000) { pieces.push(cur); cur = ""; } cur += l + "\n"; }
+      if (cur.trim()) pieces.push(cur);
+      notes = [];
+      for (let i = 0; i < pieces.length; i++) notes.push("Part " + (i + 1) + ":\n" + await chat(PART_PROMPT, "Part " + (i + 1) + " of " + pieces.length + ":\n" + pieces[i], 900));
+    }
     while (notes.join("\n\n").length > NOTES_BATCH_CHARS && notes.length > 1) {
       const groups = [];
       let cur = [];
@@ -588,7 +604,7 @@
       for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes, keep every decision, action, risk and key point:\n\n" + g.join("\n\n"), 900));
       notes = merged;
     }
-    return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 2500));
+    return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 4000, "medium"));
   }
 
   let running = null;
