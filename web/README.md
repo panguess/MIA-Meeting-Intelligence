@@ -10,6 +10,10 @@ There is no hosting address configured by this repository. Until someone hosts t
 
 A hosted static site has no sign-in gate in this prototype. Anyone with its URL can load the app, but each visitor's recordings remain in that visitor's own browser storage. The private GitHub source repository does not make a deployed website private. Do not put confidential recordings in this prototype: browser storage is not application-level encrypted.
 
+## Test on an iPhone before hosting
+
+A maintainer can test the microphone and Home Screen install on a real iPhone over local Wi‑Fi with HTTPS, without any hosting account. See [iPhone LAN testing](../docs/iphone-lan-testing.md). This is for testing only and does not provide a URL for other people.
+
 ## Use the app
 
 1. Open the HTTPS app address in Safari on the iPhone.

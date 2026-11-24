@@ -1,0 +1,4 @@
+# Local test certificates (see docs/iphone-lan-testing.md). Never commit keys.
+.local-certs/
+*.pem
+__pycache__/
