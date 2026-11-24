@@ -387,7 +387,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.11.0</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.11.1</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -459,7 +459,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.11.0</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.11.1</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -571,6 +571,11 @@
   <dialog class="sheet" id="settingsDialog" aria-labelledby="settingsTitle">
    <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button class="sheet-close" id="settingsClose" type="button">Done</button></div>
    <div class="sheet-body">
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="tyKey"><strong>Typhoon key · Thai accuracy</strong><span>Typhoon by SCB 10X · free · <b id="tyState">Off</b></span></label>
+   </section>
+   <div class="ty-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon key here"><button id="tySave" type="button">Save</button></div>
+   <a class="link-btn settings-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
    <section class="lang-row">
     <span class="lang-text"><strong>Minutes language</strong><span>Meetings are heard as Thai + English</span></span>
     <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
@@ -587,11 +592,6 @@
     <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
     <button class="svc-btn" id="svcButton" type="button">Set up · free</button>
    </section>
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="tyKey"><strong>Thai accuracy boost</strong><span>Typhoon by SCB 10X · free · <b id="tyState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon API key"><button id="tySave" type="button">Save</button></div>
-   <a class="link-btn settings-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
    <button class="link-btn settings-link hidden" id="svcLink" type="button">Change Groq key</button>
   <details class="limits">
     <summary><h2 id="limitsTitle">Tips for a complete recording</h2><span class="chev" aria-hidden="true">+</span></summary>
@@ -612,7 +612,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.11.0</p>
+    <p>MIA prototype · v0.11.1</p>
   </div>
    </div>
   </dialog>
