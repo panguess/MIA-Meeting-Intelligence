@@ -354,6 +354,8 @@
     .improve-note{font-size:12px;color:var(--muted);margin:0 4px 12px}
     .job-warn{white-space:pre-line;font-size:12px;font-weight:700;color:#8a3a00;background:#fff3d6;border:var(--line);border-radius:14px;padding:8px 12px;margin:8px 0 0}
     .diag{white-space:pre-wrap;word-break:break-word;font-size:11px;max-height:220px;overflow:auto;background:#fff;border:var(--line);border-radius:14px;padding:8px;margin:8px 0}
+    .level{height:6px;border-radius:99px;background:var(--sand);overflow:hidden;margin:6px 0}
+    .level span{display:block;height:100%;width:0;background:var(--mint);transition:width .3s}
     .more-menu{margin-top:6px}
     .more-menu summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--muted);padding:8px 4px;list-style:none}
     .more-menu summary::-webkit-details-marker{display:none}
@@ -441,7 +443,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.15.6</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.16.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -468,7 +470,7 @@
     <div class="notice" id="warning" role="alert"></div>
   </section>
 
-  <div class="live-box hidden" id="liveBox" aria-live="polite"><span class="live-label"><i></i>Live text</span><p id="liveText"></p></div>
+  <div class="live-box hidden" id="liveBox" aria-live="polite"><span class="live-label"><i></i>Transcript so far</span><div class="level" aria-hidden="true"><span id="levelFill"></span></div><p id="liveText"></p></div>
 
   <div class="title-block">
     <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" aria-label="Meeting title" placeholder="Meeting title (optional)">
@@ -515,7 +517,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.15.6</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.16.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -718,7 +720,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.15.6</p>
+    <p>MIA prototype · v0.16.0</p>
   </div>
    </div>
   </dialog>
