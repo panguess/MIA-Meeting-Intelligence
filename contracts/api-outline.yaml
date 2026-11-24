@@ -1,50 +1,48 @@
 openapi: 3.1.0
 info:
-  title: MIA API
+  title: MIA Private API
   version: 0.1.0
-  description: Initial API outline; authentication and schemas require implementation.
-servers:
-  - url: https://api.example.invalid
+  description: Draft contract; authentication and authorization schemes must be completed before production.
 paths:
   /health:
     get:
-      summary: Service health check
+      summary: Service health without sensitive diagnostics
       responses:
-        "200":
-          description: Service is available
-  /meetings:
+        '200':
+          description: Healthy
+  /api/v1/meetings:
     post:
-      summary: Create a meeting record
-      description: Requires authenticated user and validated metadata.
+      summary: Create meeting metadata
       responses:
-        "201":
+        '201':
           description: Meeting created
-    get:
-      summary: List meetings for the authenticated user
-      responses:
-        "200":
-          description: Meeting list
-  /meetings/{meetingId}/audio:
+  /api/v1/meetings/{meeting_id}/recordings:
     post:
-      summary: Upload audio captured or imported through the iPhone app
-      parameters:
-        - in: path
-          name: meetingId
-          required: true
-          schema:
-            type: string
+      summary: Register an iPhone-originated recording or imported file
       responses:
-        "202":
-          description: Audio accepted for processing
-  /meetings/{meetingId}/outputs:
+        '201':
+          description: Recording registered
+  /api/v1/meetings/{meeting_id}/transcript:
     get:
-      summary: Retrieve transcript and generated meeting outputs
-      parameters:
-        - in: path
-          name: meetingId
-          required: true
-          schema:
-            type: string
+      summary: Retrieve transcript
       responses:
-        "200":
-          description: Meeting outputs
+        '200':
+          description: Transcript
+  /api/v1/meetings/{meeting_id}/analyze:
+    post:
+      summary: Start local analysis
+      responses:
+        '202':
+          description: Analysis queued
+  /api/v1/meetings/{meeting_id}/approve:
+    post:
+      summary: Approve draft minutes
+      responses:
+        '200':
+          description: Minutes approved
+  /api/v1/meetings/{meeting_id}/audio:
+    delete:
+      summary: Request audio deletion
+      responses:
+        '202':
+          description: Deletion queued and tracked
