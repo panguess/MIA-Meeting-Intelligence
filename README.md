@@ -24,6 +24,12 @@
 ## Start here
 See [iOS build and test instructions](ios/README.md). Open `ios/MIA.xcodeproj` using Xcode on macOS.
 
+## Free iPhone testing option
+
+A free installable Safari web app (PWA) is available in `web/`. It avoids Apple Developer Program membership and TestFlight. It records on-device through the browser, imports audio, and keeps browser-local audio in IndexedDB. It is not equivalent to a native recorder and does not guarantee background recording.
+
+See [the PWA deployment and iPhone installation guide](web/README.md). Cloudflare Pages Free can host the static files from this private GitHub repository. Protect the production `*.pages.dev` address with Cloudflare Access before using the app. Use non-confidential audio only; this prototype's browser storage is not application-level encrypted.
+
 ## Repository layout
 - `ios/MIAApp/` — SwiftUI app, recorder service, local file store, app configuration
 - `ios/MIA.xcodeproj/` — Xcode project and shared scheme
