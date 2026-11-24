@@ -45,6 +45,18 @@
   const getTerms = () => { try { return (localStorage.getItem("mia-terms") || "").trim(); } catch { return ""; } };
   const TRANSCRIBER = { get ready() { return !!getKey(); }, name: "Groq" };
 
+  // Two engines heard the same audio. Typhoon (SCB 10X) is trained for Thai
+  // but writes English words in Thai letters and has no fine time stamps;
+  // Whisper keeps English words and time stamps but mishears Thai more.
+  const MERGE_PROMPT = [
+    "You combine two speech-to-text transcripts of the SAME Thai audio (Thai speech mixed with English words).",
+    "Transcript A (Whisper) has [mm:ss] time stamps and keeps English words, but often mishears Thai.",
+    "Transcript B (Typhoon) is more accurate for Thai words, but writes English words in Thai letters; it is split by minute.",
+    "Write transcript A again line by line, keeping every [mm:ss] time stamp, but correct the Thai wording using B,",
+    "and write English terms in English letters (e.g. B's 'ริสก์' -> 'risk').",
+    "Do not summarise, translate, add or remove content. If the two disagree and you are unsure, prefer B for Thai.",
+    "Output only the corrected lines."
+  ].join("\n");
   const CLEAN_PROMPT = [
     "You fix a speech-to-text transcript of Thai speech mixed with English words.",
     "Correct words that were clearly misheard, using the context (Thai spelling, English terms, names, numbers).",
@@ -404,13 +416,43 @@
           const start = i * size, end = Math.min(audio.length, start + size);
           const mono = new Float32Array(end - start);
           for (const ch of chans) for (let j = 0; j < mono.length; j++) mono[j] += ch[start + j] / chans.length;
-          return { blob: wav(mono, rate), offset: i * PART_SECONDS };
+          return { blob: wav(mono, rate), offset: i * PART_SECONDS, samples: mono, rate };
         }
       };
     } catch {
       if (blob.size > DIRECT_UPLOAD_MAX) throw new Error("This iPhone couldn't open this audio file. Try exporting it as m4a, or split it into shorter files.");
       return { duration: 0, count: 1, part: () => ({ blob, offset: 0, name: "audio" }) };
     }
+  }
+
+  // ---------- Typhoon ASR (optional, Thai accuracy boost) ----------
+  const TYPHOON = "https://api.opentyphoon.ai/v1";
+  const TYPHOON_KEY = "mia-typhoon-key";
+  const getTyphoonKey = () => { try { return localStorage.getItem(TYPHOON_KEY) || ""; } catch { return ""; } };
+  async function typhoonFile(blob, attempt = 0) {
+    const form = new FormData();
+    form.append("file", blob, "part.wav");
+    form.append("model", "typhoon-asr-realtime");
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 90000);
+    let res;
+    try {
+      res = await fetch(TYPHOON + "/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + getTyphoonKey() }, body: form, signal: ctl.signal });
+    } finally { clearTimeout(timer); }
+    if ((res.status === 429 || res.status >= 500) && attempt < 3) { await sleep(5000 * (attempt + 1)); return typhoonFile(blob, attempt + 1); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error("Typhoon " + res.status);
+    return (data.text || "").trim();
+  }
+  // One-minute pieces keep each upload small and give rough time anchors.
+  async function typhoonPart(p) {
+    if (!p.samples) throw new Error("Typhoon needs decoded audio");
+    const step = 60 * p.rate, out = [];
+    for (let s = 0, k = 0; s < p.samples.length; s += step, k++) {
+      const text = await typhoonFile(wav(p.samples.subarray(s, Math.min(p.samples.length, s + step)), p.rate));
+      if (text) out.push("[" + stamp(p.offset + k * 60) + "] " + text);
+    }
+    return out.join("\n");
   }
 
   async function transcribePart(blob, offset, lang, name) {
@@ -518,15 +560,24 @@
         job.parts[i] = job.parts[i] || {};
         if (job.parts[i].text == null) {
           const p = split.part(i);
-          const raw = await transcribePart(p.blob, p.offset, job.lang, p.name);
+          // Whisper (Groq) and, if connected, Typhoon listen to the same part.
+          const [raw, thai] = await Promise.all([
+            transcribePart(p.blob, p.offset, job.lang, p.name),
+            getTyphoonKey() ? typhoonPart(p).catch(e => { if (!job.tyWarned) { job.tyWarned = true; toast("Typhoon didn't answer (" + (e && e.message || "error") + "). Using Whisper only."); } return ""; }) : Promise.resolve("")
+          ]);
           job.parts[i].raw = raw;
+          job.parts[i].thai = thai;
           job.parts[i].text = raw;
-          // Second pass: fix misheard words from context. Kept only if it keeps
-          // the time stamps and roughly the same length; otherwise use raw.
+          job.engine = thai ? "typhoon+whisper" : "whisper";
+          // Second pass: merge with Typhoon, or fix misheard words from context.
+          // Kept only if it keeps the time stamps and roughly the same length.
           if (raw.trim()) {
             try {
               const terms = getTerms();
-              const fixed = await chat(CLEAN_PROMPT + (terms ? "\nNames and terms that may appear: " + terms : ""), raw, 3000);
+              const termNote = terms ? "\nNames and terms that may appear: " + terms : "";
+              const fixed = thai
+                ? await chat(MERGE_PROMPT + termNote, "Transcript A (Whisper):\n" + raw + "\n\nTranscript B (Typhoon):\n" + thai, 3500)
+                : await chat(CLEAN_PROMPT + termNote, raw, 3000);
               const stamps = t => (t.match(/^\[\d/gm) || []).length;
               if (fixed && stamps(fixed) >= stamps(raw) * 0.8 && fixed.length > raw.length * 0.6 && fixed.length < raw.length * 1.6) job.parts[i].text = fixed;
             } catch (e) { if (e instanceof KeyError) throw e; }
@@ -729,6 +780,14 @@
       render();
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
+    const tyState = () => { $("tyState").textContent = getTyphoonKey() ? "On" : "Off"; };
+    tyState();
+    $("tySave").addEventListener("click", () => {
+      const v = $("tyKey").value.trim();
+      try { if (v) localStorage.setItem(TYPHOON_KEY, v); else localStorage.removeItem(TYPHOON_KEY); } catch {}
+      $("tyKey").value = ""; tyState();
+      toast(v ? "Typhoon connected. New recordings use both engines." : "Typhoon turned off");
+    });
     try { $("agentTerms").value = localStorage.getItem("mia-terms") || ""; } catch {}
     $("agentTerms").addEventListener("change", e => { try { localStorage.setItem("mia-terms", e.target.value.trim()); } catch {} });
     $("agentJobs").addEventListener("click", e => {
@@ -774,7 +833,7 @@
   }
 
   // Small hook for tests and screenshots.
-  window.MIAAgent = { busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
+  window.MIAAgent = { typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
