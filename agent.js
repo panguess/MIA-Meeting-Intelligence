@@ -108,6 +108,7 @@
     "Write transcript A again line by line, keeping every [mm:ss] time stamp, but correct the Thai wording using B,",
     "and write English terms in English letters (e.g. B's 'ริสก์' -> 'risk'). Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4', 'สาม เดือน' -> '3 เดือน').",
     "Do not summarise, translate, add or remove content. If the two disagree and you are unsure, prefer B for Thai.",
+    "Fix Thai words with the wrong tone mark or a sound-alike word, using the surrounding meaning (e.g. in a car-repair context 'อู๋' -> 'อู่'; 'ค่ะ/คะ', 'ไม้/ไม่', 'ข้าว/ข่าว'). Don't turn ordinary words into people's names.",
     "Output only the corrected lines."
   ].join("\n");
   const CLEAN_PROMPT = [
@@ -115,6 +116,7 @@
     "Correct words that were clearly misheard, using the context (Thai spelling, English terms, names, numbers).",
     "Write English terms in English letters when the speaker said an English word. Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4').",
     "Do not summarise, translate, add or remove content. Keep every line and its [mm:ss] time stamp at the start.",
+    "Fix Thai words with the wrong tone mark or a sound-alike word, using the surrounding meaning (e.g. in a car-repair context 'อู๋' -> 'อู่'). Don't turn ordinary words into people's names.",
     "If unsure about a word, leave it as it is. Output only the corrected lines."
   ].join("\n");
   const PART_PROMPT = [

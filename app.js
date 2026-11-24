@@ -771,7 +771,8 @@
     seg.timer = setInterval(() => {
       if (!state.recorder || state.recorder.state !== "recording" || !seg.rec) return;
       const now = elapsedSeconds();
-      if (now - seg.startAt < SEG_SECONDS) return;
+      // First piece after 45 s so text shows up early; then every 2 minutes.
+      if (now - seg.startAt < (seg.idx === 1 ? Math.min(45, SEG_SECONDS) : SEG_SECONDS)) return;
       const old = seg.rec;
       seg.startAt = now;
       try { segOne(); } catch { seg.off = true; }
@@ -840,7 +841,7 @@
     box.classList.toggle("hidden", !recording);
     const pre = (seg.text || "").split("\n").filter(Boolean).slice(-3).map(l => l.replace(/^\[[\d:]+\]\s*/, "")).join(" ");
     const last = live.lines.slice(-3).map(l => l.text).join(" ");
-    el("liveText").textContent = (pre || last).trim() || (seg.off ? "Recording… the transcript is made after Stop." : "Recording… the first transcript appears after about 2 minutes.");
+    el("liveText").textContent = (pre || last).trim() || (seg.off ? "Recording… the transcript is made after Stop." : "Recording… the first lines appear after about 1 minute.");
   }
   function liveStart(id) {
     live.lines = []; live.interim = ""; live.failed = ""; live.id = id || null;
@@ -1051,11 +1052,37 @@
     return dbRequest("readonly", store => store.get(id));
   }
 
+  // iOS Safari often can't play or share a Blob straight out of IndexedDB
+  // ("WebKitBlobResource error"). A fresh in-memory copy works.
+  const diagApp = m => { try { window.MIAAgent && window.MIAAgent.diag && window.MIAAgent.diag(m); } catch {} };
+  async function freshBlob(record) {
+    try {
+      const buf = await record.blob.arrayBuffer();
+      return new Blob([buf], { type: record.mimeType || record.blob.type || "audio/mp4" });
+    } catch (e) {
+      diagApp("Couldn't read the saved audio (" + (e && (e.name || e.message)) + "), size " + (record.blob && record.blob.size));
+      return record.blob;
+    }
+  }
+  // Last resort for playback: decode with Web Audio and play a WAV copy.
+  async function wavCopy(blob) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx({ sampleRate: 16000 });
+    const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+    ctx.close && ctx.close();
+    const ch = audio.getChannelData(0), n = ch.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, audio.sampleRate, true); v.setUint32(28, audio.sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, ch[i])) * 0x7fff, true);
+    return new Blob([buf], { type: "audio/wav" });
+  }
+
   async function sendToAgent(id) {
     try {
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noAudio"));
-      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [], live: record.live || "" });
+      await window.MIAAgent?.addAudio(await freshBlob(record), record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [], live: record.live || "" });
     } catch (error) {
       showWarning(error?.message || t("noAudio"));
     }
@@ -1066,7 +1093,8 @@
       const record = await getRecord(id);
       if (!record?.blob) throw new Error("Audio file not found");
       revokeObjectUrl(id);
-      const url = URL.createObjectURL(record.blob);
+      const blob = await freshBlob(record);
+      const url = URL.createObjectURL(blob);
       state.currentObjectUrls.set(id, url);
 
       const recordElement = document.querySelector(`[data-record-id="${CSS.escape(id)}"]`);
@@ -1076,9 +1104,25 @@
       audio.controls = true;
       audio.preload = "metadata";
       audio.src = url;
-      audio.addEventListener("error", () => showWarning(t("noAudio")), { once: true });
+      let triedWav = false;
+      const onErr = async () => {
+        const code = audio.error ? audio.error.code : "?";
+        if (triedWav) { diagApp("Playback failed even as WAV (code " + code + ")"); showWarning("This recording can't be played on this iPhone. The transcript and report are not affected."); return; }
+        triedWav = true;
+        diagApp("Playback error code " + code + " for " + (blob.type || "?") + ", " + blob.size + " bytes. Trying a WAV copy.");
+        try {
+          const wavUrl = URL.createObjectURL(await wavCopy(blob));
+          state.currentObjectUrls.set(id, wavUrl);
+          audio.src = wavUrl;
+          await audio.play().catch(() => {});
+        } catch (e) {
+          diagApp("The audio file couldn't be decoded (" + (e && (e.name || e.message)) + ")");
+          showWarning("This recording can't be played on this iPhone. The transcript and report are not affected.");
+        }
+      };
+      audio.addEventListener("error", onErr);
       recordElement.append(audio);
-      await audio.play();
+      await audio.play().catch(e => { if (e && e.name === "NotSupportedError") onErr(); });
     } catch (error) {
       showWarning((error?.message || t("noAudio")));
     }
@@ -1089,14 +1133,14 @@
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noExport"));
       if (navigator.share && typeof File === "function") {
-        const shareFile = new File([record.blob], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
+        const shareFile = new File([await freshBlob(record)], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
         if (navigator.canShare?.({ files: [shareFile] })) {
           await navigator.share({ files: [shareFile], title: record.title || "MIA audio" });
           await markExported(id);
           return;
         }
       }
-      const url = URL.createObjectURL(record.blob);
+      const url = URL.createObjectURL(await freshBlob(record));
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = record.fileName || "MIA-audio";
