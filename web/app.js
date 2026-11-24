@@ -171,6 +171,7 @@
     el("startButton").classList.toggle("hidden", recording);
     el("stopButton").disabled = !recording;
     el("stopButton").classList.toggle("hidden", !recording);
+    el("markButton").classList.toggle("hidden", !recording);
     el("importButton").disabled = recording;
     el("meetingTitle").disabled = recording;
     const pauseButton = el("pauseButton");
@@ -554,6 +555,8 @@
       state.pausedAt = null;
       state.pausedTotal = 0;
       state.recordingId = crypto.randomUUID();
+      state.marks = [];
+      updateMarkLabel();
 
       const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
         || t("meetingWord") + " " + formatDate(state.startedAt);
@@ -601,6 +604,7 @@
         const recordedSeconds = elapsedSeconds(endedAt);
         const wasPossiblyInterrupted = state.pendingWarning;
         const stoppedByUser = state.userStopped;
+        const marks = (state.marks || []).slice();
         await state.chunkWriteQueue;
         const rows = recordingId ? await getChunks(recordingId) : [];
         const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -641,7 +645,8 @@
           mimeType: blob.type || "application/octet-stream",
           blob,
           size: blob.size,
-          incomplete: wasPossiblyInterrupted
+          incomplete: wasPossiblyInterrupted,
+          marks
         };
 
         try {
@@ -652,7 +657,7 @@
           // the Agent then gets this first part only when they tap Minutes.
           const handOff = () => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
-            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds }))
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks }))
               .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
           };
           if (!stoppedByUser) {
@@ -685,6 +690,23 @@
         showWarning((error?.message || t("micUnsupported")));
       }
     }
+  }
+
+  // Bookmarks: the user taps Mark when something important is said. The
+  // Agent highlights those moments in the transcript and the minutes.
+  function updateMarkLabel() {
+    const n = (state.marks || []).length;
+    el("markButton").querySelector(".label").textContent = n ? "Mark this moment · " + n : "Mark this moment";
+  }
+  function markMoment() {
+    if (!state.recorder) return;
+    const sec = Math.round(elapsedSeconds());
+    state.marks = state.marks || [];
+    state.marks.push(sec);
+    updateMarkLabel();
+    const mm = String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0");
+    el("heroHint").textContent = "Marked " + mm + " ★";
+    if (navigator.vibrate) navigator.vibrate(30);
   }
 
   function stopRecording() {
@@ -792,7 +814,7 @@
     try {
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noAudio"));
-      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds });
+      await window.MIAAgent?.addAudio(record.blob, record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [] });
     } catch (error) {
       showWarning(error?.message || t("noAudio"));
     }
@@ -1099,6 +1121,7 @@
     el("startButton").addEventListener("click", () => startRecording());
     el("resumeButton").addEventListener("click", () => startRecording(state.resume));
     el("stopButton").addEventListener("click", stopRecording);
+    el("markButton").addEventListener("click", markMoment);
     el("pauseButton").addEventListener("click", togglePause);
     el("importButton").addEventListener("click", () => el("fileInput").click());
     el("fileInput").addEventListener("change", async event => {

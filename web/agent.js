@@ -189,12 +189,27 @@
   }
 
   // ---------- detail view ----------
-  function renderTranscript(text) {
+  const secOf = t => t.split(":").reduce((a, x) => a * 60 + Number(x), 0);
+  // Lines the user bookmarked: the last line that starts at or before each mark.
+  function markedStamps(text, marks) {
+    const out = new Set();
+    if (!marks || !marks.length) return out;
+    const stamps = (String(text).match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]/gm) || []).map(x => x.slice(1, -1));
+    for (const mk of marks) {
+      let best = null;
+      for (const st of stamps) if (secOf(st) <= mk) best = st;
+      if (best) out.add(best);
+    }
+    return out;
+  }
+  function renderTranscript(text, marks) {
     const lines = String(text).split(/\n+/).map(l => l.trim()).filter(Boolean);
+    const hit = markedStamps(text, marks);
     return lines.map(line => {
       const m = line.match(/^\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?\s*(.*)$/);
+      const on = m && hit.has(m[1]);
       return m
-        ? '<p class="line"><span class="stamp">' + esc(m[1]) + '</span><span>' + esc(m[2]) + '</span></p>'
+        ? '<p class="line' + (on ? " marked" : "") + '"><span class="stamp">' + (on ? '<span class="star">★</span>' : "") + esc(m[1]) + '</span><span>' + esc(m[2]) + '</span></p>'
         : '<p class="line"><span>' + esc(line) + '</span></p>';
     }).join("");
   }
@@ -352,7 +367,7 @@
     if (!onMinutes) {
       const q = $("transcriptSearch").value.trim().toLowerCase();
       const text = q ? job.transcript.split("\n").filter(l => l.toLowerCase().includes(q)).join("\n") : job.transcript;
-      $("transcriptBody").innerHTML = text.trim() ? renderTranscript(text) : '<p class="muted">No lines match.</p>';
+      $("transcriptBody").innerHTML = text.trim() ? renderTranscript(text, job.marks) : '<p class="muted">No lines match.</p>';
       $("barPrimary").innerHTML = ICON.text.replace('width="18"', 'width="18"') + "<span>Copy for summary</span>";
       $("barPrimary").dataset.act = "copySummary";
       $("barSecondary").innerHTML = "<span>Open Claude</span>";
@@ -537,7 +552,10 @@
   // Meeting -> minutes format; presentation or lecture -> talk summary.
   // "auto" lets the model decide and report it on the first line.
   function finalPrompt(job) {
-    const lang = "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (headings stay in English).";
+    const mk = (job.marks || []).map(stamp);
+    const marksNote = mk.length ? "\nThe user bookmarked these moments as important while recording: " + mk.join(", ") +
+      ". Make sure what was said around each time is covered, and put a ★ before those points." : "";
+    const lang = marksNote + "\nWrite in " + ((job.outLang || "th") === "en" ? "English" : "Thai") + ", even if the recording is in another language (headings stay in English).";
     const talk = "You write a clear summary of a presentation or lecture, from the notes or transcript provided.\nKeep the section headings below in English, exactly:\n" + TALK_FORMAT +
       "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown. No introduction.";
     if (job.kind === "meeting") return "TYPE: meeting\n" + FINAL_PROMPT + lang;
@@ -724,6 +742,7 @@
         id: "job-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         name: name || "Meeting " + fmtDate(Date.now()), createdAt: Date.now(), lang: state.lang, outLang: state.out,
         recordId: opts.recordId || null,
+        marks: opts.marks || [],
         audio: blob, audioType: blob.type, size: blob.size,
         duration: opts.duration || await audioDuration(blob),
         status: "queued", progress: 0, transcript: "", minutes: "", parts: []
@@ -744,6 +763,34 @@
   }
 
   function summaryText(job) { return MINUTES_PROMPT + "\n\n" + job.transcript.trim(); }
+
+  // ---------- Export: Word (.doc) and PDF (print) ----------
+  function exportHtml(job) {
+    const meta = [fmtDate(job.createdAt), fmtDur(job.duration)].filter(Boolean).join(" · ");
+    return "<h1>" + esc(job.name) + "</h1><p>" + esc(meta) + "</p>" + renderMinutes(job.minutes) +
+      "<p style=\"color:#777;font-size:9pt\">Prepared with MIA. Check items marked verify.</p>";
+  }
+  const safeName = n => (String(n || "Minutes").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Minutes").slice(0, 80);
+  async function exportWord(job) {
+    const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>' + esc(job.name) +
+      '</title><style>body{font-family:Calibri,"Leelawadee UI",sans-serif;font-size:11pt}table{border-collapse:collapse}td,th{border:1px solid #999;padding:4px 6px}.verify{color:#b00}</style></head><body>' +
+      exportHtml(job) + "</body></html>";
+    const file = new File(["\ufeff" + html], safeName(job.name) + " - minutes.doc", { type: "application/msword" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: job.name }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file); a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  }
+  function exportPdf(job) {
+    $("printArea").innerHTML = exportHtml(job);
+    const old = document.title;
+    document.title = safeName(job.name) + " - minutes";
+    window.print();
+    setTimeout(() => { document.title = old; }, 1000);
+  }
 
   async function act(name) {
     const job = state.jobs.find(j => j.id === state.openId);
@@ -847,6 +894,9 @@
       render(); window.scrollTo({ top: 0 });
     });
     $("detailBack").addEventListener("click", () => { state.openId = null; render(); });
+    const openJob = () => state.jobs.find(j => j.id === state.openId && j.minutes);
+    $("exportWord").addEventListener("click", () => { const j = openJob(); if (j) exportWord(j); });
+    $("exportPdf").addEventListener("click", () => { const j = openJob(); if (j) exportPdf(j); });
     $("trackerOpen").addEventListener("click", () => { state.tracker = true; render(); window.scrollTo({ top: 0 }); });
     $("trackerBack").addEventListener("click", () => { state.tracker = false; render(); });
     $("trackerSeg").addEventListener("click", e => { const b = e.target.closest("button[data-kind]"); if (b) { state.trackerKind = b.dataset.kind; renderTracker(); } });
