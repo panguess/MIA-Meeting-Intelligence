@@ -317,7 +317,7 @@
     }
     // Only offer to continue if the interrupted recording started recently.
     if (latest && Date.now() - latest.startedAt < 6 * 60 * 60 * 1000) {
-      offerResume(nextPart(latest), "recoveredHint");
+      offerResume({ ...nextPart(latest), series: latest.series || latest.id, since: latest.endedAt || latest.startedAt }, "recoveredHint");
       setStatus(t("stoppedUnexpectedly"), false);
       const endedAt = latest.endedAt || latest.startedAt;
       if (Date.now() - endedAt < AUTO_RESUME_MS) scheduleAutoResume(state.resume, endedAt);
@@ -587,7 +587,11 @@
         part,
         fileName,
         startedAt: state.startedAt,
-        mimeType
+        mimeType,
+        // Parts of one session (split by a call or lock) share a series id, so
+        // the Agent writes ONE report for the whole session.
+        series: continuing && continuing.series || null,
+        gapSec: continuing && continuing.since ? Math.round((Date.now() - continuing.since) / 1000) : 0
       }), SESSION_STORE);
       state.userStopped = false;
 
@@ -644,7 +648,7 @@
           if (recordingId) await deleteSessionData(recordingId);
           setStatus(t("ready"), false);
           showWarning(t("noAudio"));
-          if (!stoppedByUser && sessionRows) { offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1 }, "resumeHint"); scheduleAutoResume(state.resume, endedAt); }
+          if (!stoppedByUser && sessionRows) { offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1, series: sessionRows.series || null, since: endedAt }, "resumeHint"); scheduleAutoResume(state.resume, endedAt); }
           return;
         }
 
@@ -673,12 +677,12 @@
           // the Agent then gets this first part only when they tap Minutes.
           const handOff = (stay = false) => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
-            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText }))
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText, series: sessionRows && sessionRows.series, gapSec: sessionRows && sessionRows.gapSec }))
               .catch(error => showWarning("Couldn't start the Agent: " + (error?.message || error)));
           };
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
-            offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
+            offerResume({ ...nextPart(sessionRows || { baseTitle: "", part: 1 }), series: (sessionRows && sessionRows.series) || recordingId, since: endedAt }, "resumeHint");
             scheduleAutoResume(state.resume, endedAt);
             // iOS stopped it (call, lock, app switch). Still send this part to the
             // Agent in the background so nothing waits on the user; the Record tab
