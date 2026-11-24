@@ -109,6 +109,7 @@
     "and write English terms in English letters (e.g. B's 'ริสก์' -> 'risk'). Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4', 'สาม เดือน' -> '3 เดือน').",
     "Do not summarise, translate, add or remove content. If the two disagree and you are unsure, prefer B for Thai.",
     "Fix Thai words with the wrong tone mark or a sound-alike word, using the surrounding meaning (e.g. in a car-repair context 'อู๋' -> 'อู่'; 'ค่ะ/คะ', 'ไม้/ไม่', 'ข้าว/ข่าว'). Don't turn ordinary words into people's names.",
+    "Common Thai sound-alikes to check against the meaning: ตี/ปี (e.g. student year 'ปีสาม'), ดาวน์/ดาว, โอน/โอ้, ล้าน/ลาน. Garbled English is often a known business term (e.g. 'Wealth Management'); fix it only when the meaning makes it obvious.",
     "Output only the corrected lines."
   ].join("\n");
   const CLEAN_PROMPT = [
@@ -117,6 +118,7 @@
     "Write English terms in English letters when the speaker said an English word. Write numbers as digits (e.g. 'พระราม สี่' -> 'พระราม 4').",
     "Do not summarise, translate, add or remove content. Keep every line and its [mm:ss] time stamp at the start.",
     "Fix Thai words with the wrong tone mark or a sound-alike word, using the surrounding meaning (e.g. in a car-repair context 'อู๋' -> 'อู่'). Don't turn ordinary words into people's names.",
+    "Common Thai sound-alikes to check against the meaning: ตี/ปี (e.g. student year 'ปีสาม'), ดาวน์/ดาว, โอน/โอ้, ล้าน/ลาน. Garbled English is often a known business term (e.g. 'Wealth Management'); fix it only when the meaning makes it obvious.",
     "If unsure about a word, leave it as it is. Output only the corrected lines."
   ].join("\n");
   const PART_PROMPT = [
@@ -179,7 +181,7 @@
     "- Then a '## ข้อเท็จจริงสำคัญ' (Key facts) 2-column table ONLY if there are several concrete facts (places, people, durations, amounts, dates), with (mm:ss).",
     "- Optionally a short timeline table if the story has several dated steps.",
     "Do NOT add Decisions, Action items, Risks, Next steps, advice, lessons or recommendations: this is a story, not a meeting. Nobody has to do anything.",
-    "Use only what the speaker said; write [verify] for anything unclear."
+    "Use only what the speaker said. Mark unclear or implausible words with [?] instead of explaining them."
   ].join("\n");
   const FINAL_PROMPT = [
     "You are an experienced corporate secretary writing formal meeting minutes for the risk management team of a large Thai company.",
@@ -811,6 +813,8 @@
     "- A 'decision' is only something people in the recording explicitly decided (e.g. 'we agreed', 'approved'). Someone describing what they did in the past is NOT a decision. An 'action' is only a task someone was asked or agreed to do.",
     "- Match the length to the recording: under 3 minutes of speech → a few sentences and at most 6 bullets; longer recordings → as long as the content needs.",
     "- If the transcript is too garbled to understand, say so in one line and summarise only what is clear.",
+    "- SENSE CHECK: speech-to-text often hears a sound-alike word. Before writing a fact, ask 'is this plausible?'. If not, use the plausible reading only when it is obvious (e.g. internship 'ตีสาม-ตีสี่' is almost surely 'ปีสาม-ปีสี่' = 3rd-4th year of university), otherwise keep the words as heard and add [?].",
+    "- Never explain, expand or convert an unclear word or name (no guessed clock times, amounts, company or project names). Copy it as heard and add [?]. Do not smooth contradictory or nonsensical parts into a neat story: say briefly that this part was unclear.",
     "- For a personal story or casual talk: no Decisions, Actions or Next steps sections unless the speaker clearly stated them as such."
   ].join("\n");
   function finalPrompt(job, kind) {
