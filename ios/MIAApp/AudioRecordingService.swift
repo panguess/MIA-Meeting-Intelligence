@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 
 @MainActor
@@ -21,7 +22,7 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
     }
 
     deinit {
-        notificationTokens.forEach(NotificationCenter.default.removeObserver)
+        notificationTokens.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     func requestMicrophonePermission() async -> Bool {
@@ -80,6 +81,7 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
             recorder = newRecorder
             isRecording = true
             statusMessage = "กำลังบันทึก / Recording"
+            persistCurrentManifestIfNeeded()
         } catch {
             statusMessage = "เริ่มบันทึกไม่สำเร็จ / Could not start"
             warningMessage = error.localizedDescription
@@ -92,22 +94,12 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
         recorder.stop()
         self.recorder = nil
         isRecording = false
-
-        do {
-            try session.setActive(false, options: .notifyOthersOnDeactivation)
-            if var manifest = currentManifest {
-                manifest.endedAt = Date()
-                let fileURL = try store.newRecordingURL(id: manifest.id)
-                manifest.sha256 = try store.checksum(of: fileURL)
-                try store.save(manifest)
-                currentManifest = nil
-            }
+        finalizeCurrentRecording()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        if warningMessage == nil {
             statusMessage = "บันทึกและบันทึกไฟล์แล้ว / Recording saved"
-            refreshRecordings()
-        } catch {
-            statusMessage = "บันทึกไฟล์ไม่สมบูรณ์ / Finalization failed"
-            warningMessage = error.localizedDescription
         }
+        refreshRecordings()
     }
 
     func importAudio(from url: URL) {
@@ -120,6 +112,15 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
             statusMessage = "นำเข้าไฟล์ไม่สำเร็จ / Import failed"
             warningMessage = error.localizedDescription
         }
+    }
+
+    func reportImportError(_ error: Error) {
+        let nsError = error as NSError
+        guard !(nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError) else {
+            return
+        }
+        statusMessage = "นำเข้าไฟล์ไม่สำเร็จ / Import failed"
+        warningMessage = error.localizedDescription
     }
 
     func refreshRecordings() {
@@ -192,13 +193,32 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
         currentManifest?.interruptionEvents.append(message)
         warningMessage = message
         statusMessage = "การบันทึกถูกรบกวน โปรดตรวจสอบไฟล์ / Recording interrupted — review the file"
-        if isRecording {
-            recorder?.stop()
-            recorder = nil
-            isRecording = false
-            currentManifest?.endedAt = Date()
+        guard isRecording else {
             persistCurrentManifestIfNeeded()
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            return
+        }
+
+        recorder?.stop()
+        recorder = nil
+        isRecording = false
+        finalizeCurrentRecording()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func finalizeCurrentRecording() {
+        guard var manifest = currentManifest else { return }
+        manifest.endedAt = Date()
+
+        do {
+            let fileURL = try store.newRecordingURL(id: manifest.id)
+            manifest.sha256 = try store.checksum(of: fileURL)
+            try store.protectAudioFile(at: fileURL)
+            try store.save(manifest)
+            currentManifest = nil
+        } catch {
+            warningMessage = "ปิดไฟล์หรือบันทึก manifest ไม่สำเร็จ: \(error.localizedDescription)"
+            currentManifest = manifest
+            persistCurrentManifestIfNeeded()
         }
     }
 
@@ -215,6 +235,10 @@ final class AudioRecordingService: NSObject, ObservableObject, AVAudioRecorderDe
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         warningMessage = error?.localizedDescription ?? "เกิดข้อผิดพลาดขณะเข้ารหัสเสียง"
         isRecording = false
+        self.recorder = nil
+        finalizeCurrentRecording()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        refreshRecordings()
     }
 }
 
