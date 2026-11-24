@@ -25,9 +25,19 @@ Official setup guide: https://developers.cloudflare.com/pages/framework-guides/d
 
 A deployed Pages URL is publicly reachable unless you add an access-control layer. The GitHub source repository can remain Private, but the website itself is not private just because its source repository is private.
 
-Before using MIA, configure Cloudflare Zero Trust → Access to protect the Pages hostname and allow only your email address. Cloudflare advertises an Access Free plan for teams under 50 users: https://www.cloudflare.com/th-th/sase/products/access/
+Before using MIA, protect the production `*.pages.dev` hostname. Cloudflare's Pages dashboard provides an **Enable access policy** setting. Follow the current Pages-specific sequence:
 
-The app does not upload recordings, transcripts, or audio files to Cloudflare. Cloudflare serves the static app files. However, a public URL without Access protection lets other people open the app and use it on their own devices.
+1. Workers & Pages → select the MIA Pages project → Settings → **Enable access policy**.
+2. Select **Manage** on the Access policy created for preview deployments.
+3. In Access → Applications, select the MIA project → Configure.
+4. Under Public hostname, remove the wildcard (`*`) from the Subdomain field and save. Cloudflare may ask you to change the application name.
+5. Return to the Pages project → Settings → General and enable the access policy again so preview deployments are protected too.
+6. Confirm that there is one Access application for the production `*.pages.dev` hostname and a separate one for preview deployments.
+7. Set the production policy to **Allow** only your own email address. Do not choose “Everyone”.
+
+Cloudflare's Access Free plan is advertised for teams under 50 users: https://www.cloudflare.com/th-th/sase/products/access/
+
+The app does not upload recordings, transcripts, or audio files to Cloudflare. Cloudflare serves the static app files. However, until the production hostname is protected, anyone who knows the URL can open the app and use it on their own device.
 
 ## Install on iPhone
 
@@ -48,7 +58,7 @@ The app does not upload recordings, transcripts, or audio files to Cloudflare. C
 - Allows in-app playback, export through the iOS Share Sheet (where supported), and deletion.
 - 90-day local cleanup target; browser persistent-storage permission is requested where supported.
 - No server upload of audio, analytics, external JavaScript libraries, or AI provider calls.
-- Static app assets are cached for offline app-shell use after the first successful load.
+- JavaScript and app assets can be cached, but the HTML navigation is deliberately not cached so Cloudflare Access can authenticate each app launch. Reopening the app requires an internet connection.
 
 ## Critical iOS and privacy limitations
 
