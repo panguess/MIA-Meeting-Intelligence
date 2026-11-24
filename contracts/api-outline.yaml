@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: MIA API
+  version: 0.1.0
+  description: Initial API outline; authentication and schemas require implementation.
+servers:
+  - url: https://api.example.invalid
+paths:
+  /health:
+    get:
+      summary: Service health check
+      responses:
+        "200":
+          description: Service is available
+  /meetings:
+    post:
+      summary: Create a meeting record
+      description: Requires authenticated user and validated metadata.
+      responses:
+        "201":
+          description: Meeting created
+    get:
+      summary: List meetings for the authenticated user
+      responses:
+        "200":
+          description: Meeting list
+  /meetings/{meetingId}/audio:
+    post:
+      summary: Upload audio captured or imported through the iPhone app
+      parameters:
+        - in: path
+          name: meetingId
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Audio accepted for processing
+  /meetings/{meetingId}/outputs:
+    get:
+      summary: Retrieve transcript and generated meeting outputs
+      parameters:
+        - in: path
+          name: meetingId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Meeting outputs
