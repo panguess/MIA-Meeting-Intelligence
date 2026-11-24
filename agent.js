@@ -972,11 +972,9 @@
   // ---------- Groq setup sheet ----------
   function renderService() {
     const ok = !!getKey();
-    $("svcState").textContent = ok ? "Connected" : "Not set up";
-    $("svcState").className = "detail-pill " + (ok ? "mint" : "sun");
-    $("svcButton").textContent = ok ? "Settings" : "Set up · free";
-    $("svcCard").classList.toggle("hidden", ok);   // only shown when setup is needed
-    $("svcLink").classList.toggle("hidden", !ok);
+    $("svcState").textContent = ok ? "✓ Connected" : "Not set up";
+    $("svcState").className = "";
+    $("svcButton").textContent = ok ? "Change key" : "Set up";
     for (const g of document.querySelectorAll("[data-settings]")) g.classList.toggle("dot", !ok);
     $("keyRemove").classList.toggle("hidden", !ok);
     renderStatus();
@@ -1212,12 +1210,22 @@
       $("oaKey").value = ""; oaState(); refreshModels(true); renderModels();
       toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
     });
-    const tyState = () => { $("tyState").textContent = getTyphoonKey() ? "On" : "Off"; };
+    const tyState = () => {
+      $("tyState").textContent = getTyphoonKey() ? "✓ Connected" : "Not connected";
+      $("tyToggle").textContent = getTyphoonKey() ? "Change key" : "Connect";
+    };
+    // Each "Change key" / "Set up" opens the edit box inside its own row.
+    for (const [btn, box] of [["tyToggle", "tyEdit"], ["gdToggle", "gdEdit"]]) {
+      $(btn).addEventListener("click", () => {
+        const open = $(box).classList.toggle("hidden") === false;
+        $(btn).setAttribute("aria-expanded", String(open));
+      });
+    }
     tyState();
     $("tySave").addEventListener("click", () => {
       const v = $("tyKey").value.trim();
       try { if (v) localStorage.setItem(TYPHOON_KEY, v); else localStorage.removeItem(TYPHOON_KEY); } catch {}
-      $("tyKey").value = ""; tyState(); renderStatus(); refreshModels(true);
+      $("tyKey").value = ""; tyState(); renderStatus(); $("tyEdit").classList.add("hidden"); refreshModels(true);
       toast(v ? "Typhoon connected. New recordings use both engines." : "Typhoon turned off");
     });
     try { $("agentTerms").value = localStorage.getItem("mia-terms") || ""; } catch {}
