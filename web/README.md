@@ -6,7 +6,7 @@ MIA is a static web app for recording audio into storage on the iPhone. It has n
 
 The app must be served from an HTTPS website before iPhone Safari can reliably access the microphone and install it as a Home Screen app. The website owner or maintainer must arrange hosting; the person using MIA does not need to create a Cloudflare, GitHub, Apple, or MIA account or pay for an app subscription.
 
-There is no hosting address configured by this repository. Until someone hosts the static files, there is no URL to open on iPhone and no Home Screen installation to complete. Hosting services can change their free plans; do not assume that hosting will remain free.
+There is no hosting address configured by this repository. Until someone hosts the static files, there is no URL to open on iPhone and no Home Screen installation to complete. Hosting services can change their free plans; do not assume that hosting will remain free. The hosting maintainer should follow the [hosting checklist](../docs/hosting.md).
 
 A hosted static site has no sign-in gate in this prototype. Anyone with its URL can load the app, but each visitor's recordings remain in that visitor's own browser storage. The private GitHub source repository does not make a deployed website private. Do not put confidential recordings in this prototype: browser storage is not application-level encrypted.
 
