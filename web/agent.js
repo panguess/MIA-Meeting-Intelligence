@@ -510,6 +510,8 @@
     $("svcState").textContent = ok ? "Connected" : "Not set up";
     $("svcState").className = "detail-pill " + (ok ? "mint" : "sun");
     $("svcButton").textContent = ok ? "Settings" : "Set up · free";
+    $("svcCard").classList.toggle("hidden", ok);   // only shown when setup is needed
+    $("svcLink").classList.toggle("hidden", !ok);
     $("keyRemove").classList.toggle("hidden", !ok);
   }
   function openSetup() {
@@ -671,6 +673,7 @@
     $("writeMinutes").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) processJob(j); });
     $("refineClaude").addEventListener("click", () => act("copySummary"));
     $("svcButton").addEventListener("click", openSetup);
+    $("svcLink").addEventListener("click", openSetup);
     $("keySave").addEventListener("click", saveKeyFromInput);
     $("keyCancel").addEventListener("click", () => $("groqDialog").close());
     $("keyRemove").addEventListener("click", () => { if (window.confirm("Remove the Groq key from this iPhone?")) { setKey(""); $("groqDialog").close(); render(); } });
