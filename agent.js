@@ -10,16 +10,12 @@
   const MAX_AUDIO_BYTES = 500 * 1024 * 1024;
 
   const MINUTES_PROMPT = [
-    "You are writing meeting minutes for a risk management team.",
-    "Write the minutes in the same language as the transcript (usually Thai).",
-    "Use these sections, in this order, as Markdown:",
-    "## Overview (2-3 sentences)",
-    "## Key points (bullets)",
-    "## Decisions (bullets)",
-    "## Action items (table: Task | Owner | Due date)",
-    "## Open issues (bullets)",
-    "## Risks raised (bullets)",
-    "Only use facts from the transcript. If a name, number or date is unclear, write [verify].",
+    "Summarise this recording (Thai with English terms; machine transcript with [mm:ss] times, so ignore filler and recognition errors).",
+    "First decide what it is: a MEETING, or a lecture/class/briefing/presentation.",
+    "Meeting: write formal minutes with ## Overview, ## Key points (grouped by agenda topic), ## Decisions, ## Action items (table: Task | Owner | Due date), ## Open issues, ## Risks raised (risk → impact → mitigation).",
+    "Lecture or presentation: one sentence on what it is, a table of key facts (numbers, dates, scores, scope), then numbered sections by topic, tables where items share attributes, and ## What to do next.",
+    "Organise by TOPIC, not time order: if a topic comes back later, put it under that topic and keep both times. If something is later corrected or contradicted, keep the final version and note 'later clarified (mm:ss)'.",
+    "Add (mm:ss) source times to key points. Write in the transcript's language; keep English terms in English. Use only facts from the transcript; write [verify] for anything unclear.",
     "",
     "Transcript:"
   ].join("\n");
@@ -80,6 +76,8 @@
     "Then a short heading that names the content (e.g. the exam, the project, the policy).",
     "If there are key numbers, dates, scores, amounts, deadlines or scope: put them first in a 2-column Markdown table (Item | Detail).",
     "Then numbered sections with headings that fit the content (## 1. ..., ## 2. ...), each with specific bullets.",
+    "Organise by TOPIC (agenda item, chapter, project), not by time order. If the talk returns to an earlier topic later, put that point under the earlier topic and keep both times.",
+    "If something said later corrects, updates or contradicts something earlier, keep the final version and note it, e.g. 'later clarified (mm:ss): …'.",
     "Use a Markdown table whenever items share attributes (e.g. chapter | topic | what to focus on).",
     "If the speaker gave instructions, tips, warnings or things to prepare, end with ## What to do next (bullets).",
     "If there was Q&A, add ## Q&A (question → answer).",
@@ -97,6 +95,8 @@
     "## Risks raised  (bullets: risk → possible impact → mitigation if discussed; - None if none)",
     "Style: formal business language (Thai: ภาษาทางการ, concise), keep English business terms in English (e.g. KPI, audit, risk appetite).",
     "Be specific: keep names, numbers, amounts and dates. Merge duplicates. No generic filler.",
+    "Organise by TOPIC (agenda item, chapter, project), not by time order. If the talk returns to an earlier topic later, put that point under the earlier topic and keep both times.",
+    "If something said later corrects, updates or contradicts something earlier, keep the final version and note it, e.g. 'later clarified (mm:ss): …'.",
     "Before writing, check that every decision, action and risk in the input appears in the minutes.",
     "Where the input gives times, end key points, decisions and risks with the source time as (mm:ss), so the reader can check the recording.",
     "Use only facts from the input. If a name, number or date is unclear or missing, write [verify].",
@@ -659,7 +659,7 @@
       }
       if (cur.length) groups.push(cur);
       const merged = [];
-      for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes, keep every decision, action, risk and key point:\n\n" + g.join("\n\n"), 900));
+      for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes. Group them by topic (not time order): a point that returns to an earlier topic goes under that topic. Keep every decision, action, risk and key point, the (mm:ss) times, and any later corrections:\n\n" + g.join("\n\n"), 900));
       notes = merged;
     }
     return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 4000, "medium"));
