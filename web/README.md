@@ -1,46 +1,69 @@
 # MIA PWA — free iPhone testing route
 
-This is a static, installable web-app prototype. It does not require Apple Developer Program membership, TestFlight, Xcode, or a Mac.
+This is an installable static web-app prototype. It does not require Apple Developer Program membership, TestFlight, Xcode, or a Mac.
 
-## Hosting
-Deploy this `web/` directory as a static site over HTTPS. Cloudflare Pages offers a Free plan and GitHub integration. For this repository, use:
-- Production branch: `main`
-- Build command: leave blank
-- Build output directory: `web`
-- Root directory: `/`
+## Zero-cost hosting option
 
-Cloudflare Pages documentation:
-- https://developers.cloudflare.com/pages/get-started/
-- https://developers.cloudflare.com/pages/configuration/git-integration/
+Cloudflare Pages has a Free plan. Its currently published limits include 500 builds/month and up to 20,000 files per site; this small static app is well below those limits. Check plan terms before relying on them long-term.
 
-The source repository remains private; the deployed static web app URL is accessible to anyone who knows or discovers it unless an access-control layer is separately configured. This prototype uploads no meeting audio or transcripts to the hosting provider.
+Create a Cloudflare account on the Free plan, then:
+
+1. Open https://dash.cloudflare.com/ and go to **Workers & Pages**.
+2. Select **Create application** → **Pages** → **Connect to Git**.
+3. Connect GitHub. Authorize Cloudflare Pages to access only the private `panguess/MIA-Meeting-Intelligence` repository if GitHub presents repository selection.
+4. Select `panguess/MIA-Meeting-Intelligence`.
+5. Set project name to `mia-meeting` (or another available name).
+6. Set **Production branch** to `main`.
+7. Set **Framework preset** to None.
+8. Set **Build command** to `exit 0` (or leave it blank for a no-build static site).
+9. Set **Build output directory** to `web`.
+10. Deploy. Cloudflare will provide an HTTPS `*.pages.dev` address and redeploy when the connected branch changes.
+
+Official setup guide: https://developers.cloudflare.com/pages/framework-guides/deploy-anything/
+
+## Important privacy step before use
+
+A deployed Pages URL is publicly reachable unless you add an access-control layer. The GitHub source repository can remain Private, but the website itself is not private just because its source repository is private.
+
+Before using MIA, configure Cloudflare Zero Trust → Access to protect the Pages hostname and allow only your email address. Cloudflare advertises an Access Free plan for teams under 50 users: https://www.cloudflare.com/th-th/sase/products/access/
+
+The app does not upload recordings, transcripts, or audio files to Cloudflare. Cloudflare serves the static app files. However, a public URL without Access protection lets other people open the app and use it on their own devices.
 
 ## Install on iPhone
-1. Open the deployed HTTPS URL in Safari on iPhone.
-2. Tap Share.
-3. Choose Add to Home Screen.
-4. Open MIA from the Home Screen.
-5. Allow microphone access when prompted.
-6. Keep MIA in the foreground while recording. Do not lock the screen or switch apps during a meeting until device testing proves the behavior reliable.
+
+1. Open the protected HTTPS Pages URL in Safari on iPhone.
+2. Complete the Cloudflare Access email verification.
+3. Tap Safari's Share button.
+4. Choose **Add to Home Screen**.
+5. Open MIA from the Home Screen.
+6. Allow microphone access when prompted.
+7. Keep MIA in the foreground while recording. Do not lock the screen or switch apps.
 
 ## Current behavior
+
 - Live iPhone microphone recording using MediaRecorder.
-- Saves recording chunks and completed audio locally in IndexedDB.
+- Recording chunks are written incrementally to IndexedDB so some captured audio may be recoverable if the browser closes unexpectedly.
+- Incomplete sessions are recovered and marked for review on next launch.
 - Imports user-selected audio files through the iPhone browser file picker.
-- Allows playback, export/download, and deletion of local recordings.
-- 90-day local cleanup target.
-- No server upload, analytics, external JavaScript libraries, or AI provider calls.
-- Works offline after the initial HTTPS load and service-worker cache.
+- Allows in-app playback, export through the iOS Share Sheet (where supported), and deletion.
+- 90-day local cleanup target; browser persistent-storage permission is requested where supported.
+- No server upload of audio, analytics, external JavaScript libraries, or AI provider calls.
+- Static app assets are cached for offline app-shell use after the first successful load.
 
-## Critical iOS limitations
-This is a free testing route, not a replacement for a fully tested native recorder. iOS may suspend Safari or a Home Screen web app when it is backgrounded, the screen locks, or the system needs resources. A browser recording can therefore pause or end unexpectedly. The app warns when it detects a visibility change, but cannot guarantee continuous recording through all iOS lifecycle events.
+## Critical iOS and privacy limitations
 
-Browser storage can be evicted by the operating system or removed when site/app data is cleared. Export important recordings after each meeting. The 90-day cleanup is best-effort and runs when MIA is opened; it is not a server-side retention guarantee.
-
-Before using for important or confidential meetings, test short recordings, screen-lock behavior, incoming calls, route changes, imports, playback, and export on the actual iPhone.
+This is a free testing route, not a replacement for a native recorder:
+- iOS may suspend Safari or a Home Screen web app when it is backgrounded, the screen locks, or the system needs resources. Recording is not guaranteed to continue. Keep MIA in the foreground.
+- Chunk persistence can salvage audio already written to IndexedDB, but it cannot recover audio that iOS never delivered to the browser.
+- Browser storage can be evicted by the operating system or cleared by the user. Export important recordings after each meeting.
+- IndexedDB is not application-level encrypted by this prototype. Use non-confidential test audio only until the security model is reviewed.
+- The 90-day cleanup is best-effort and runs when MIA is opened; it is not a server-side retention guarantee.
+- The 1 GiB file-size guardrail does not guarantee the browser has that much storage available.
+- Test short recordings, screen-lock behavior, incoming calls, route changes, imports, playback, and export on the actual iPhone before considering longer sessions.
 
 ## Not implemented
+
 - Transcription, diarization, meeting minutes, action items, risk/issue extraction
 - Cloud sync or backend
 - Guaranteed background recording
-- Strong authentication for the public static URL
+- Native app packaging or App Store distribution
