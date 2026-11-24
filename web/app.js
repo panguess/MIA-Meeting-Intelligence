@@ -12,7 +12,7 @@
   // All interface text, in English. Keep strings short and plain.
   const translations = {
     en: {
-      tagline: "Private meeting recorder",
+      tagline: "Ready for your next meeting?",
       onDevice: "On-device",
       timerCaption: "hours · minutes · seconds",
       ready: "Ready to record",
@@ -25,9 +25,13 @@
       onlineCopy: "Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.",
       chooseFile: "Import an audio file",
       importCopy: "From the Files app. Stored in MIA, never uploaded.",
-      library: "Recordings",
+      library: "My recordings",
       empty: "No recordings yet",
       emptyHint: "Tap Start recording when your meeting begins.",
+      heroIdle: "Tap Start when your meeting begins",
+      heroLive: "I'm listening · keep MIA open",
+      heroPaused: "Paused · tap Continue to go on",
+      heroResume: "Tap Resume to keep going",
       privacy: "Audio stays on this iPhone. No account, no cloud, no uploads. MIA reminds you about files older than 90 days but never deletes them on its own.",
       micDenied: "MIA can't use the microphone. Tap Allow when iPhone asks. If you tapped Don't Allow before, go to Settings → Apps → Safari → Microphone, choose Ask or Allow, then try again.",
       micUnsupported: "This browser can't record audio here. Open MIA in Safari on iPhone (iOS 15 or later).",
@@ -151,6 +155,7 @@
     pauseButton.querySelector(".label").textContent = t(paused ? "unpause" : "pause");
     pauseButton.querySelector(".icon-pause").classList.toggle("hidden", paused);
     pauseButton.querySelector(".icon-play").classList.toggle("hidden", !paused);
+    el("heroHint").textContent = t(paused ? "heroPaused" : recording ? "heroLive" : state.resume ? "heroResume" : "heroIdle");
     if (recording) hideResume();
   }
 
@@ -163,6 +168,7 @@
     el("resumeButton").querySelector(".label").textContent = resumeLabel(resume.part);
     el("resumeButton").classList.remove("hidden");
     el("controls").classList.add("has-resume");
+    el("heroHint").textContent = t("heroResume");
     el("startButton").querySelector("[data-i18n]").textContent = t("startNew");
     showWarning(t(hintKey));
   }
@@ -327,6 +333,8 @@
     }
     records.sort((a, b) => b.createdAt - a.createdAt);
     el("recordCount").textContent = String(records.length);
+    el("statTotal").textContent = String(records.length);
+    el("statUnexported").textContent = String(records.filter(record => !record.exportedAt).length);
     renderReminders(records);
     container.replaceChildren();
 
@@ -334,27 +342,29 @@
       const empty = document.createElement("div");
       empty.className = "empty";
       const icon = document.createElement("div");
-      icon.className = "empty-icon";
-      icon.innerHTML = ICONS.mic;
+      icon.className = "empty-face";
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = '<span class="eye"><i></i></span><span class="eye"><i></i></span>';
       const title = document.createElement("div");
+      title.className = "empty-title";
       title.textContent = t("empty");
       const hint = document.createElement("div");
-      hint.style.fontSize = "13px";
+      hint.className = "empty-hint";
       hint.textContent = t("emptyHint");
       empty.append(icon, title, hint);
       container.append(empty);
       return;
     }
 
-    for (const record of records) {
+    records.forEach((record, position) => {
       const item = document.createElement("article");
-      item.className = "record";
+      item.className = "record tone-" + (position % 4);
       item.dataset.recordId = record.id;
 
       const head = document.createElement("div");
       head.className = "record-head";
       const icon = document.createElement("div");
-      icon.className = "record-icon" + (record.origin === "imported" ? " imported" : "");
+      icon.className = "record-icon";
       icon.innerHTML = record.origin === "imported" ? ICONS.file : ICONS.mic;
       const main = document.createElement("div");
       main.className = "record-main";
@@ -407,7 +417,7 @@
 
       item.append(head, badges, actions);
       container.append(item);
-    }
+    });
   }
 
   function humanBytes(value) {

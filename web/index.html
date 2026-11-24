@@ -3,175 +3,193 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b0f17">
-  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#fff6ec">
+  <meta name="color-scheme" content="light">
   <meta name="description" content="MIA — private meeting recorder. Audio stays on your iPhone.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="MIA">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon-180.png">
   <title>MIA — Meeting Intelligence Assistant</title>
   <style>
-    /* System fonts only (San Francisco on iPhone). No web fonts, no CDNs. */
+    /* Fonts are bundled with the app (SIL Open Font License, see fonts/OFL-*.txt).
+       Nothing is loaded from the internet. */
+    @font-face{font-family:"Fredoka";font-weight:600;font-style:normal;font-display:swap;src:url("./fonts/fredoka-latin-600-normal.woff2") format("woff2")}
+    @font-face{font-family:"Nunito";font-weight:700;font-style:normal;font-display:swap;src:url("./fonts/nunito-latin-700-normal.woff2") format("woff2")}
+    @font-face{font-family:"Nunito";font-weight:800;font-style:normal;font-display:swap;src:url("./fonts/nunito-latin-800-normal.woff2") format("woff2")}
+
     :root{
-      color-scheme:dark;
-      --bg:#0b0f17;--surface:#141a24;--surface-2:#1b2330;--surface-3:#232d3d;
-      --line:rgba(255,255,255,.07);--line-strong:rgba(255,255,255,.13);
-      --text:#f4f6fa;--muted:#8d98a9;--faint:#5f6a7b;
-      --accent:#4fd1b5;--accent-ink:#04211b;--accent-soft:rgba(79,209,181,.13);
-      --record:#ff453a;--record-soft:rgba(255,69,58,.14);
-      --amber:#ffb340;--amber-soft:rgba(255,179,64,.12);
-      --radius:22px;
-      --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-      --font-rounded:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+      color-scheme:light;
+      --cream:#fff6ec;--paper:#ffffff;--ink:#2b1b17;--ink-2:#5c3b33;--muted:#6b4f47;
+      --coral:#cc4430;--coral-soft:#f7836f;--peach:#ffb4a6;--mint:#a8e6c8;--lilac:#c8b8ff;--sky:#a9d4ff;--sun:#ffd166;--sand:#f1e4d8;
+      --line:2px solid var(--ink);
+      --display:"Fredoka",ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,sans-serif;
+      --body:"Nunito",ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html{background:var(--bg)}
-    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;
-      padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px)}
-    body::before{content:"";position:fixed;inset:0 0 auto;height:420px;pointer-events:none;z-index:-1;
-      background:radial-gradient(120% 70% at 50% 0%,rgba(79,209,181,.10),transparent 70%);transition:background .6s}
-    body.is-recording::before{background:radial-gradient(120% 70% at 50% 0%,rgba(255,69,58,.16),transparent 70%)}
-    body.is-paused::before{background:radial-gradient(120% 70% at 50% 0%,rgba(255,179,64,.12),transparent 70%)}
-    main{width:min(100%,560px);margin:0 auto;padding:8px 0 24px}
+    html{background:var(--cream)}
+    body{margin:0;min-height:100vh;background:var(--cream);color:var(--ink);font-family:var(--body);font-weight:700;font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;
+      padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 18px) calc(env(safe-area-inset-left) + 18px)}
+    main{width:min(100%,540px);margin:0 auto;padding:6px 0 20px}
     .hidden{display:none!important}
     svg{display:block;flex:none}
     button,input{font:inherit;color:inherit}
     button{cursor:pointer;touch-action:manipulation}
-    button:disabled{opacity:.4;cursor:default}
-    button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    button:disabled{opacity:.45;cursor:default}
+    button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+    h1,h2{font-family:var(--display);font-weight:600;margin:0;letter-spacing:-.01em}
+
+    /* Mascot eyes, reused in several places */
+    .eye{display:grid;place-items:center;border-radius:50%;background:#fff;border:var(--line)}
+    .eye i{display:block;border-radius:50%;background:var(--ink)}
 
     /* Header */
-    .top{display:flex;align-items:center;gap:12px;margin:10px 4px 18px}
-    .app-icon{width:44px;height:44px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
-    .top h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
-    .top p{margin:1px 0 0;font-size:13px;color:var(--muted)}
-    .pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600;white-space:nowrap}
+    .top{display:flex;align-items:center;gap:12px;margin:8px 0 16px}
+    .avatar{width:46px;height:46px;border-radius:50%;background:var(--coral);border:var(--line);display:flex;align-items:center;justify-content:center;gap:4px;flex:none}
+    .avatar .eye{width:13px;height:13px;border-width:2px}.avatar .eye i{width:5px;height:5px}
+    .top-text{flex:1;min-width:0}
+    .top h1{font-size:23px;line-height:1.15}
+    .top p{margin:1px 0 0;font-size:14px;color:var(--muted)}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:#d7f3e3;color:#1e6b47;font-size:12px;font-weight:800;white-space:nowrap}
 
-    /* Cards */
-    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:0 0 14px}
-    .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-    .section-head h2{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
-    .count{min-width:26px;padding:3px 9px;border-radius:999px;background:var(--surface-3);color:var(--muted);font-size:13px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
-
-    /* Recorder */
-    .recorder{padding:22px 20px 20px;text-align:center}
-    .status-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:14px;font-weight:600;max-width:100%}
+    /* Hero recorder */
+    .hero{position:relative;overflow:hidden;background:var(--coral);color:#fff;border:var(--line);border-radius:32px;padding:20px 20px 22px;margin-bottom:14px}
+    .blob{position:absolute;right:-34px;bottom:-46px;width:176px;height:176px;border-radius:46% 54% 50% 50%/55% 45% 55% 45%;background:var(--coral-soft);border:var(--line);transition:transform .5s}
+    .blob-eyes{position:absolute;right:44px;bottom:58px;display:flex;gap:8px}
+    .blob-eyes .eye{width:28px;height:28px}.blob-eyes .eye i{width:11px;height:11px;transition:transform .4s}
+    body.is-recording .blob{transform:scale(1.06) rotate(-4deg)}
+    body.is-recording .blob-eyes .eye i{transform:translate(-3px,-2px)}
+    body.is-paused .blob-eyes .eye i{transform:translate(0,4px)}
+    .hero > *:not(.blob):not(.blob-eyes){position:relative}
+    .status-pill{display:inline-flex;align-items:center;gap:8px;max-width:calc(100% - 10px);padding:7px 13px 7px 11px;border-radius:999px;background:#fff;color:var(--ink);border:var(--line);font-size:14px;font-weight:800}
     #statusText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
-    .dot.live{background:var(--record);box-shadow:0 0 0 0 rgba(255,69,58,.6);animation:pulse 1.6s infinite}
-    .dot.paused{background:var(--amber);box-shadow:none;animation:none}
-    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,69,58,.55)}70%{box-shadow:0 0 0 9px rgba(255,69,58,0)}100%{box-shadow:0 0 0 0 rgba(255,69,58,0)}}
-    .timer{font-family:var(--font-rounded);font-size:clamp(52px,17vw,68px);font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;margin:26px 0 6px;color:var(--text);transition:color .3s}
-    body.is-recording .timer{color:#fff}
-    body.is-paused .timer{color:var(--amber)}
-    .timer-caption{font-size:13px;color:var(--muted);margin-bottom:22px}
-    .field-label{display:block;text-align:left;font-size:13px;font-weight:600;color:var(--muted);margin:0 2px 7px}
-    .field{width:100%;border:1px solid var(--line-strong);background:var(--surface-2);border-radius:14px;padding:14px 15px;font-size:16px;outline:none;transition:border-color .2s}
-    .field::placeholder{color:var(--faint)}
-    .field:focus{border-color:var(--accent)}
-    .field:disabled{opacity:.6}
-
-    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:56px;border-radius:16px;border:0;font-size:17px;font-weight:600;padding:0 12px;white-space:nowrap;transition:transform .12s,opacity .2s,background .2s}
-    .btn:active:not(:disabled){transform:scale(.97)}
-    .btn-record{grid-column:1/-1;background:var(--record);color:#fff;box-shadow:0 10px 28px rgba(255,69,58,.32)}
-    .rec-dot{width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.28)}
-    .btn-stop{background:var(--record);color:#fff}
-    .btn-stop .stop-square{width:13px;height:13px;border-radius:3px;background:#fff}
-    .btn-pause{background:var(--surface-3);color:var(--text)}
-    .btn-resume{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);box-shadow:0 10px 28px rgba(79,209,181,.25)}
-    .controls.has-resume .btn-record{background:var(--surface-3);box-shadow:none;min-height:50px;font-size:16px}
+    .dot{width:9px;height:9px;border-radius:50%;background:#b9a49d;flex:none}
+    .dot.live{background:var(--coral);animation:pulse 1.4s infinite}
+    .dot.paused{background:#e0a100;animation:none}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(204,68,48,.6)}70%{box-shadow:0 0 0 8px rgba(204,68,48,0)}100%{box-shadow:0 0 0 0 rgba(204,68,48,0)}}
+    .timer{font-family:var(--display);font-weight:600;font-size:clamp(50px,15.5vw,64px);line-height:1.05;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin:14px 0 2px}
+    .listening{display:block;max-width:calc(100% - 110px);margin:0 0 14px;font-size:14px;opacity:.95}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;max-width:calc(100% - 96px)}
+    body.is-recording .controls,body.is-paused .controls,.controls.has-resume{max-width:none}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 22px;border-radius:999px;border:var(--line);font-family:var(--display);font-weight:600;font-size:19px;white-space:nowrap;transition:transform .12s}
+    .btn:active:not(:disabled){transform:scale(.96)}
+    .btn-record{background:#fff;color:var(--ink)}
+    .rec-dot{width:15px;height:15px;border-radius:50%;background:var(--coral)}
+    .btn-pause{flex:1;background:var(--sun);color:var(--ink);padding:0 14px}
+    .btn-stop{flex:1;background:#fff;color:var(--ink);padding:0 14px}
+    .stop-square{width:14px;height:14px;border-radius:4px;background:var(--coral)}
+    .btn-resume{flex:1 1 100%;background:var(--sun);color:var(--ink)}
+    .controls.has-resume .btn-record{flex:1 1 100%;background:transparent;color:#fff;border-color:#fff;min-height:50px;font-size:17px}
+    .controls.has-resume .rec-dot{background:#fff}
 
     /* Notices */
-    .notice{display:none;text-align:left;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;margin-top:14px;background:var(--amber-soft);color:#ffd79a;border:1px solid rgba(255,179,64,.22)}
+    .notice{display:none;background:#fff;color:var(--ink-2);border:2px dashed var(--coral);border-radius:20px;padding:12px 14px;font-size:14px;line-height:1.45;margin:14px 0 0}
     .notice.show{display:block}
+    .hero .notice{color:var(--ink);border:var(--line)}
     #reminder{margin:0 0 12px}
 
+    /* Title field */
+    .field-label{display:block;font-size:14px;font-weight:800;margin:0 4px 6px}
+    .field{width:100%;border:var(--line);background:#fff;border-radius:18px;padding:14px 16px;font-size:16px;font-weight:700;outline:none}
+    .field::placeholder{color:#9c8079}
+    .field:disabled{opacity:.6}
+    .title-block{margin-bottom:14px}
+
+    /* Stats */
+    .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    .stat{border:var(--line);border-radius:22px;padding:13px 15px;display:flex;flex-direction:column;gap:2px}
+    .stat b{font-family:var(--display);font-weight:600;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+    .stat span{font-size:14px;font-weight:800}
+    .stat.lilac{background:var(--lilac)}.stat.sun{background:var(--sun)}
+
+    /* Cards */
+    .card{background:#fff;border:var(--line);border-radius:26px;padding:18px;margin-bottom:14px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .section-head h2{font-size:22px}
+    .count{min-width:30px;padding:3px 10px;border-radius:999px;background:var(--ink);color:#fff;font-size:14px;font-weight:800;text-align:center}
+
     /* iPhone limits */
-    .limits h2{font-size:17px;margin:0}
+    .limits h2{font-size:20px}
     .limits .lead{margin:4px 0 14px;color:var(--muted);font-size:14px}
     .tip-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-    .tip-list li{display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:1.4}
-    .tip-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--surface-3);color:var(--text)}
-    .tip-icon.amber{background:var(--amber-soft);color:var(--amber)}
-    .tip-icon.teal{background:var(--accent-soft);color:var(--accent)}
-    .tip-list strong{display:block;font-weight:600}
-    .tip-list span{color:var(--muted);font-size:14px}
+    .tip-list li{display:flex;gap:12px;align-items:flex-start}
+    .tip-icon{width:36px;height:36px;border-radius:50%;border:var(--line);display:grid;place-items:center;flex:none}
+    .tip-list strong{display:block;font-weight:800;font-size:15px}
+    .tip-list span{display:block;color:var(--muted);font-size:14px;font-weight:700}
 
     /* Recordings */
-    .records{display:flex;flex-direction:column;gap:10px}
-    .empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 10px 12px;color:var(--muted);text-align:center;font-size:15px}
-    .empty-icon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--surface-2);color:var(--faint)}
-    .record{background:var(--surface-2);border:1px solid var(--line);border-radius:18px;padding:14px}
-    .record-head{display:flex;gap:12px;align-items:flex-start}
-    .record-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--record-soft);color:var(--record)}
-    .record-icon.imported{background:var(--accent-soft);color:var(--accent)}
+    .records{display:flex;flex-direction:column;gap:12px}
+    .empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px 8px;text-align:center}
+    .empty-face{width:70px;height:70px;border-radius:46% 54% 50% 50%/55% 45% 55% 45%;background:var(--peach);border:var(--line);display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px}
+    .empty-face .eye{width:20px;height:20px}.empty-face .eye i{width:8px;height:8px}
+    .empty-title{font-family:var(--display);font-weight:600;font-size:18px}
+    .empty-hint{font-size:14px;color:var(--muted)}
+    .record{border:var(--line);border-radius:24px;padding:14px;background:var(--peach)}
+    .record.tone-1{background:var(--mint)}.record.tone-2{background:var(--lilac)}.record.tone-3{background:var(--sky)}
+    .record-head{display:flex;gap:12px;align-items:center}
+    .record-icon{width:44px;height:44px;border-radius:50%;border:var(--line);background:#fff;display:grid;place-items:center;flex:none;color:var(--ink)}
     .record-main{min-width:0;flex:1}
-    .record-name{font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
-    .record-meta{font-size:13px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+    .record-name{font-family:var(--display);font-weight:600;font-size:18px;line-height:1.25;overflow-wrap:anywhere}
+    .record-meta{font-size:13px;color:#3d2722;margin-top:2px;font-variant-numeric:tabular-nums}
     .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-    .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surface-3);color:var(--muted)}
-    .badge.warn{background:var(--amber-soft);color:var(--amber)}
-    .badge.ok{background:var(--accent-soft);color:var(--accent)}
+    .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#fff;border:var(--line);font-size:12px;font-weight:800}
+    .badge.warn{background:var(--sun)}
+    .badge.ok{background:#fff}
     .record-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
-    .action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:54px;border:0;border-radius:12px;background:var(--surface-3);font-size:12px;font-weight:600;color:var(--text);padding:6px 2px}
-    .action:active{transform:scale(.96)}
-    .action.export{background:var(--accent-soft);color:var(--accent)}
-    .action.danger{color:#ff7b72}
+    .action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:54px;border-radius:16px;border:var(--line);background:#fff;color:var(--ink);font-size:12px;font-weight:800;padding:6px 2px}
+    .action:active{transform:scale(.95)}
+    .action.export{background:var(--ink);color:#fff}
+    .action.danger{color:#b3261e}
     .record audio{width:100%;height:40px;margin-top:12px}
 
     /* Rows (import, online) */
     .row-button{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:transparent;border:0;padding:0}
-    .row-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--accent-soft);color:var(--accent)}
-    .row-icon.blue{background:rgba(100,160,255,.13);color:#7fb0ff}
+    .row-icon{width:44px;height:44px;border-radius:50%;border:var(--line);display:grid;place-items:center;flex:none;background:var(--mint)}
+    .row-icon.sky{background:var(--sky)}
     .row-text{flex:1;min-width:0}
-    .row-text strong{display:block;font-size:16px;font-weight:600}
+    .row-text strong{display:block;font-family:var(--display);font-weight:600;font-size:17px}
     .row-text span{display:block;color:var(--muted);font-size:14px;margin-top:2px}
-    .chevron{color:var(--faint)}
-    .divider{height:1px;background:var(--line);margin:16px 0 16px 53px}
+    .divider{height:0;border-top:2px dashed var(--sand);margin:16px 0}
     #fileInput{display:none}
 
-    .foot{text-align:center;color:var(--faint);font-size:12px;line-height:1.6;padding:10px 12px 0}
+    .foot{text-align:center;color:var(--muted);font-size:12px;line-height:1.6;padding:6px 12px 0}
     .foot p{margin:0 0 8px}
 
     @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-    @media (min-width:600px){main{padding-top:28px}}
+    @media (min-width:600px){main{padding-top:26px}}
   </style>
 </head>
 <body>
 <main>
   <header class="top">
-    <img class="app-icon" src="./icon.svg" alt="" width="44" height="44">
-    <div>
-      <h1>MIA</h1>
-      <p data-i18n="tagline">Private meeting recorder</p>
+    <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
+    <div class="top-text">
+      <h1>Hello there!</h1>
+      <p data-i18n="tagline">Ready for your next meeting?</p>
     </div>
     <span class="pill" aria-label="Audio stays on this device">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       <span data-i18n="onDevice">On-device</span>
     </span>
   </header>
 
-  <section class="card recorder" aria-label="Recorder">
+  <section class="hero" aria-label="Recorder">
+    <div class="blob" aria-hidden="true"></div>
+    <div class="blob-eyes" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
     <div class="status-pill" role="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">Ready to record</span></div>
     <div class="timer" id="timer" aria-label="Recorded time">00:00:00</div>
-    <div class="timer-caption" data-i18n="timerCaption">hours · minutes · seconds</div>
-
-    <label class="field-label" for="meetingTitle" data-i18n="meetingTitle">Meeting title</label>
-    <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Optional · auto-named by date">
-
+    <span class="listening" id="heroHint">Tap Start when your meeting begins</span>
     <div class="controls" id="controls">
       <button class="btn btn-resume hidden" id="resumeButton" type="button">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
         <span class="label">Resume</span>
       </button>
       <button class="btn btn-record" id="startButton" type="button"><span class="rec-dot" aria-hidden="true"></span><span data-i18n="start">Start recording</span></button>
       <button class="btn btn-pause hidden" id="pauseButton" type="button">
-        <svg class="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>
-        <svg class="icon-play hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <svg class="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>
+        <svg class="icon-play hidden" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
         <span class="label">Pause</span>
       </button>
       <button class="btn btn-stop hidden" id="stopButton" type="button" disabled><span class="stop-square" aria-hidden="true"></span><span data-i18n="stop">Stop &amp; save</span></button>
@@ -179,23 +197,33 @@
     <div class="notice" id="warning" role="alert"></div>
   </section>
 
+  <div class="title-block">
+    <label class="field-label" for="meetingTitle" data-i18n="meetingTitle">Meeting title</label>
+    <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Optional · auto-named by date">
+  </div>
+
+  <div class="stats">
+    <div class="stat lilac"><b id="statTotal">0</b><span>Recordings</span></div>
+    <div class="stat sun"><b id="statUnexported">0</b><span>To export</span></div>
+  </div>
+
   <section class="card limits" aria-labelledby="limitsTitle">
     <h2 id="limitsTitle">iPhone recording limits</h2>
     <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
     <ul class="tip-list">
-      <li><span class="tip-icon amber"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
+      <li><span class="tip-icon" style="background:var(--peach)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
         <div><strong>Keep MIA open on screen</strong><span>Don't press the lock button or switch apps while recording. MIA tries to keep the screen awake.</span></div></li>
-      <li><span class="tip-icon amber"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></span>
+      <li><span class="tip-icon" style="background:var(--lilac)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></span>
         <div><strong>Turn on Do Not Disturb</strong><span>Also turn off Low Power Mode. If the screen still dims, set Auto-Lock to Never.</span></div></li>
-      <li><span class="tip-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
+      <li><span class="tip-icon" style="background:var(--sun)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
         <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
-      <li><span class="tip-icon teal"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
+      <li><span class="tip-icon" style="background:var(--mint)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
         <div><strong>Export after every meeting</strong><span>iOS can clear browser storage. Tap Export, then Save to Files.</span></div></li>
     </ul>
   </section>
 
   <section class="card" aria-labelledby="libraryTitle">
-    <div class="section-head"><h2 id="libraryTitle" data-i18n="library">Recordings</h2><span class="count" id="recordCount">0</span></div>
+    <div class="section-head"><h2 id="libraryTitle" data-i18n="library">My recordings</h2><span class="count" id="recordCount">0</span></div>
     <div class="notice" id="reminder" role="status"></div>
     <div class="records" id="records"></div>
   </section>
@@ -203,13 +231,13 @@
   <section class="card">
     <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
     <button class="row-button" id="importButton" type="button">
-      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
+      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
       <span class="row-text"><strong data-i18n="chooseFile">Import an audio file</strong><span data-i18n="importCopy">From the Files app. Stored in MIA, never uploaded.</span></span>
-      <svg class="chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
+      <svg width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
     </button>
     <div class="divider"></div>
     <div class="row-button">
-      <span class="row-icon blue"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
+      <span class="row-icon sky"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
       <span class="row-text"><strong data-i18n="onlineTitle">Online meeting?</strong><span data-i18n="onlineCopy">Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.</span></span>
     </div>
   </section>
