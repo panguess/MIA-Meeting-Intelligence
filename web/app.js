@@ -45,6 +45,9 @@
       reminderUnexported: "มี {n} ไฟล์ที่ยังไม่ได้ส่งออก พื้นที่ในเบราว์เซอร์อาจถูก iOS ล้างได้ ควรกด ส่งออก → บันทึกไปยังไฟล์ หลังจบประชุมทุกครั้ง",
       reminderOld: "มี {n} ไฟล์เก่าเกิน 90 วัน MIA จะไม่ลบเอง เมื่อส่งออกเก็บไว้แล้วให้กด ลบ ด้วยตัวเอง",
       resume: "อัดต่อ",
+      pause: "พักชั่วคราว",
+      unpause: "บันทึกต่อ",
+      paused: "พักการบันทึกอยู่ · แตะ บันทึกต่อ",
       resumePart: "ส่วนที่",
       stoppedUnexpectedly: "การบันทึกหยุดกลางคัน",
       resumeHint: "เสียงก่อนหน้าเก็บไว้แล้ว แตะ อัดต่อ เพื่อบันทึกส่วนถัดไปทันที",
@@ -102,6 +105,9 @@
       reminderUnexported: "{n} file(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
       reminderOld: "{n} file(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they are exported.",
       resume: "Resume",
+      pause: "Pause",
+      unpause: "Continue",
+      paused: "Recording paused · tap Continue",
       resumePart: "part",
       stoppedUnexpectedly: "Recording stopped unexpectedly",
       resumeHint: "The audio so far is saved. Tap Resume to record the next part right away.",
@@ -142,6 +148,8 @@
     recordingId: null,
     pendingWarning: false,
     userStopped: false,
+    pausedAt: null,
+    pausedTotal: 0,
     wakeLock: null,
     resume: null
   };
@@ -170,6 +178,10 @@
     el("startButton").disabled = recording;
     el("stopButton").disabled = !recording;
     el("importButton").disabled = recording;
+    el("statusDot").classList.toggle("paused", recording && !!state.pausedAt);
+    const pauseButton = el("pauseButton");
+    pauseButton.classList.toggle("hidden", !recording || typeof state.recorder?.pause !== "function");
+    pauseButton.textContent = t(state.pausedAt ? "unpause" : "pause");
     if (recording) hideResume();
   }
 
@@ -484,12 +496,12 @@
           state.pendingWarning = true;
           showWarning(t("trackMuted"));
           // Stop instead of silently saving a long section of silence.
-          if (state.recorder && state.recorder.state === "recording") state.recorder.stop();
+          if (state.recorder && state.recorder.state !== "inactive") state.recorder.stop();
         });
         microphoneTrack.addEventListener("ended", () => {
           state.pendingWarning = true;
           showWarning(t("trackEnded"));
-          if (state.recorder && state.recorder.state === "recording") state.recorder.stop();
+          if (state.recorder && state.recorder.state !== "inactive") state.recorder.stop();
         });
       }
       state.chunks = [];
@@ -497,6 +509,8 @@
       state.chunkWriteQueue = Promise.resolve();
       state.pendingWarning = false;
       state.startedAt = Date.now();
+      state.pausedAt = null;
+      state.pausedTotal = 0;
       state.recordingId = crypto.randomUUID();
 
       const baseTitle = continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim();
@@ -539,7 +553,7 @@
       recorder.addEventListener("stop", async () => {
         const endedAt = Date.now();
         const recordingId = state.recordingId;
-        const startedAt = state.startedAt || endedAt;
+        const recordedSeconds = elapsedSeconds(endedAt);
         const wasPossiblyInterrupted = state.pendingWarning;
         const stoppedByUser = state.userStopped;
         await state.chunkWriteQueue;
@@ -556,6 +570,8 @@
         state.recorder = null;
         state.chunks = [];
         state.startedAt = null;
+        state.pausedAt = null;
+        state.pausedTotal = 0;
         state.recordingId = null;
         state.pendingWarning = false;
         stopTimer();
@@ -576,7 +592,7 @@
           fileName,
           origin: "live",
           createdAt: endedAt,
-          durationSeconds: Math.max(0, (endedAt - startedAt) / 1000),
+          durationSeconds: recordedSeconds,
           mimeType: blob.type || "application/octet-stream",
           blob,
           size: blob.size,
@@ -624,6 +640,33 @@
     }
   }
 
+  // Recorded time, excluding paused periods.
+  function elapsedSeconds(now = Date.now()) {
+    if (!state.startedAt) return 0;
+    const pausedNow = state.pausedAt ? now - state.pausedAt : 0;
+    return Math.max(0, (now - state.startedAt - state.pausedTotal - pausedNow) / 1000);
+  }
+
+  function togglePause() {
+    const recorder = state.recorder;
+    if (!recorder) return;
+    try {
+      if (recorder.state === "recording") {
+        recorder.pause();
+        state.pausedAt = Date.now();
+        setStatus(t("paused"), true);
+      } else if (recorder.state === "paused") {
+        recorder.resume();
+        state.pausedTotal += Date.now() - (state.pausedAt || Date.now());
+        state.pausedAt = null;
+        setStatus(t("recordingStarted"), true);
+      }
+      updateTimer();
+    } catch (error) {
+      showWarning(error?.message || t("storageFailed"));
+    }
+  }
+
   function startTimer() {
     stopTimer();
     updateTimer();
@@ -632,7 +675,7 @@
 
   function updateTimer() {
     if (!state.startedAt) return;
-    el("timer").textContent = formatDuration((Date.now() - state.startedAt) / 1000);
+    el("timer").textContent = formatDuration(elapsedSeconds());
   }
 
   function stopTimer() {
@@ -771,7 +814,7 @@
       showWarning(t("interruption"));
     } else if (document.visibilityState === "visible") {
       // iOS releases the wake lock whenever the page is hidden.
-      if (state.recorder && state.recorder.state === "recording" && !state.wakeLock) acquireWakeLock();
+      if (state.recorder && state.recorder.state !== "inactive" && !state.wakeLock) acquireWakeLock();
       // Keep the flag until finalization so the saved recording is marked for review.
       if (state.pendingWarning) showWarning(t("interruption"));
     }
@@ -793,6 +836,7 @@
     el("startButton").addEventListener("click", () => startRecording());
     el("resumeButton").addEventListener("click", () => startRecording(state.resume));
     el("stopButton").addEventListener("click", stopRecording);
+    el("pauseButton").addEventListener("click", togglePause);
     el("importButton").addEventListener("click", () => el("fileInput").click());
     el("fileInput").addEventListener("change", async event => {
       await importFile(event.target.files?.[0]);

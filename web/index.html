@@ -31,6 +31,7 @@
     .notice.show{display:block}.copy{color:var(--muted);font-size:13px;line-height:1.55}.limitation{border-left:3px solid var(--warn);padding-left:11px;color:#f2d69e}
     .row{display:flex;align-items:center;justify-content:space-between;gap:12px}.row h2{font-size:15px;margin:0}.small{font-size:11px;color:var(--muted)}
     .records{display:flex;flex-direction:column;gap:9px;margin-top:13px}.record{border:1px solid var(--line);border-radius:13px;padding:12px;background:#0f1b2a}.record-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}.record-meta{font-size:11px;color:var(--muted);margin-top:5px}.record-actions{display:flex;gap:8px;margin-top:10px}.record-actions button{padding:8px 10px;font-size:12px}.delete{color:#ff9ca2;border-color:#75434a}.record.unexported{border-color:#8d7041}
+    .pause{grid-column:1/-1;border-color:var(--warn);color:var(--warn);background:#46371e66}.dot.paused{background:var(--warn);box-shadow:none;animation:none}
     .resume{grid-column:1/-1;background:var(--accent);border-color:var(--accent);color:#07151d;min-height:56px;font-size:17px}
     .privacy{font-size:11px;color:var(--muted);line-height:1.6;text-align:center;padding:14px 8px}.hidden{display:none!important}
     #fileInput{display:none}.secondary{background:transparent}.primary-text{color:var(--accent)}
@@ -58,6 +59,7 @@
     <div class="controls">
       <button class="start" id="startButton" type="button" data-i18n="start">เริ่มบันทึก</button>
       <button class="stop" id="stopButton" type="button" disabled data-i18n="stop">หยุดและบันทึก</button>
+      <button class="pause hidden" id="pauseButton" type="button">พักชั่วคราว</button>
       <button class="resume hidden" id="resumeButton" type="button">อัดต่อ</button>
     </div>
     <div class="notice" id="warning" role="status"></div>
