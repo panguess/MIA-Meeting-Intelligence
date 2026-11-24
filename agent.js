@@ -70,7 +70,7 @@
   async function refreshModels(force) {
     if (!force && models.at && Date.now() - models.at < 24 * 3600 * 1000) return;
     const tasks = [];
-    if (getKey()) tasks.push(listIds(GROQ + "/models", getKey()).then(ids => { if (ids) { models.groqStt = pickModel("groqStt", ids); models.groqLlm = pickModel("groqLlm", ids); } }));
+    if (getKey()) tasks.push(listIds(GROQ + "/models", getKey()).then(ids => { if (ids) { models.groqStt = pickModel("groqStt", ids); models.groqLlm = pickModel("groqLlm", ids); models.groqIds = ids; } }));
     if (getTyphoonKey()) tasks.push(listIds(TYPHOON + "/models", getTyphoonKey()).then(ids => { if (ids && ids.length) models.typhoon = pickModel("typhoon", ids); }));
     if (getOpenAIKey()) tasks.push(listIds(OPENAI + "/models", getOpenAIKey()).then(ids => { if (ids && ids.length) { models.openai = pickModel("openai", ids); models.openaiLlm = pickModel("openaiLlm", ids); } }));
     await Promise.all(tasks);
@@ -81,7 +81,7 @@
   function renderModels() {
     const el = document.getElementById("modelNote");
     if (!el) return;
-    const parts = ["Speech: " + useModel("groqStt"), "Minutes: " + useModel("groqLlm")];
+    const parts = ["Speech: " + useModel("groqStt"), "Reports: " + reportModel()];
     if (getTyphoonKey()) parts.push("Typhoon: " + useModel("typhoon"));
     if (getOpenAIKey()) parts.push("OpenAI: " + useModel("openai"));
     if (getOpenAIKey() && brainOn()) parts.push("Reports: " + useModel("openaiLlm"));
@@ -162,13 +162,24 @@
   ].join("\n");
   // Anything else: no template. Infer the best report for the purpose.
   const SMART_PROMPT = [
-    "You are an excellent analyst. The input is a machine transcript of a recording (Thai with English terms): ignore filler and recognition errors, infer the intended meaning.",
-    "Work out what this recording is and what the listener needs from it (e.g. an interview, a phone call, a site visit, a brainstorm, a voice memo, a training).",
-    "Start with ONE sentence saying what it is and its main point. Then write the report a skilled professional would produce for that purpose, with clear ## headings you choose.",
-    "Lead with the facts: put key numbers, dates, names and amounts in a 2-column table (Item | Detail) when there are several.",
-    "Organise by topic, not time. Merge repeated points; when something is later updated or corrected, keep the latest version and note 'updated (mm:ss)'.",
-    "Use tables where items share attributes. Add ## Next steps ONLY if the speaker said something must be done; never suggest steps yourself.",
-    "Add (mm:ss) source times to key points. Use only facts from the input; write [verify] for anything unclear."
+    "You are a thoughtful, skilled writer. The input is a machine transcript (Thai with English terms): ignore filler and recognition errors, infer the intended meaning.",
+    "FIRST understand it: what is this recording, who is speaking, and what would a reader want to take away? Do not fill in a template.",
+    "Then write what a skilled human would write for THAT purpose, choosing only the headings the content really needs (often just two or three).",
+    "Start with a clear 2-4 sentence summary in good, natural prose.",
+    "Use a 2-column table (Item | Detail) only when there are several concrete facts (numbers, dates, names, places, amounts).",
+    "Organise by topic, not time. Merge repeated points; if something is corrected later, keep the latest version and note 'updated (mm:ss)'.",
+    "Add (mm:ss) source times to key facts. Use only facts from the input; write [verify] for anything unclear."
+  ].join("\n");
+  // A personal story, anecdote or experience someone tells.
+  const STORY_PROMPT = [
+    "You are a skilled writer. The input is a machine transcript of someone telling a story or describing an experience (Thai with English terms): ignore filler and recognition errors, infer the intended meaning.",
+    "Write it up the way a good journalist would retell it to a friend:",
+    "- Start with a short headline-style sentence in bold.",
+    "- Then 1-3 short paragraphs of natural, well-written prose: what happened, in order, with the reasons and feelings the speaker gave.",
+    "- Then a '## ข้อเท็จจริงสำคัญ' (Key facts) 2-column table ONLY if there are several concrete facts (places, people, durations, amounts, dates), with (mm:ss).",
+    "- Optionally a short timeline table if the story has several dated steps.",
+    "Do NOT add Decisions, Action items, Risks, Next steps, advice, lessons or recommendations: this is a story, not a meeting. Nobody has to do anything.",
+    "Use only what the speaker said; write [verify] for anything unclear."
   ].join("\n");
   const FINAL_PROMPT = [
     "You are an experienced corporate secretary writing formal meeting minutes for the risk management team of a large Thai company.",
@@ -365,7 +376,7 @@
   function renderMinutes(md) {
     const out = [];
     let table = null, list = null;
-    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[verify\]/gi, '<span class="verify">verify</span>')
+    const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, "$1<i>$2</i>").replace(/\[verify\]/gi, '<span class="verify">verify</span>')
       // (mm:ss) source times jump to that moment in the transcript.
       .replace(/\((\d{1,2}:\d{2}(?::\d{2})?)\)/g, '<button class="seek" type="button" data-seek="$1">$1</button>');
     const flush = () => {
@@ -384,8 +395,12 @@
       if (line.startsWith("|")) { if (list) flush(); (table = table || []).push(line); continue; }
       if (table) flush();
       if (/^[-*•]\s+/.test(line)) { (list = list || []).push("<li>" + inline(line.replace(/^[-*•]\s+/, "")) + "</li>"); continue; }
+      if (/^\d+[.)]\s+/.test(line)) { (list = list || []).push('<li class="num"><b>' + line.match(/^\d+/)[0] + ".</b> " + inline(line.replace(/^\d+[.)]\s+/, "")) + "</li>"); continue; }
       flush();
-      if (/^#{1,4}\s+/.test(line)) out.push('<h3>' + inline(line.replace(/^#+\s+/, "")) + "</h3>");
+      if (/^#{3,4}\s+/.test(line)) out.push('<h4>' + inline(line.replace(/^#+\s+/, "")) + "</h4>");
+      else if (/^#{1,2}\s+/.test(line)) out.push('<h3>' + inline(line.replace(/^#+\s+/, "")) + "</h3>");
+      else if (/^(-{3,}|\*{3,})$/.test(line)) continue;
+      else if (line && !out.length) out.push('<p class="lead">' + inline(line) + "</p>");
       else if (line) out.push("<p>" + inline(line) + "</p>");
     }
     flush();
@@ -761,14 +776,24 @@
     return segs.map(s => (s.text || "").trim() ? "[" + stamp(offset + (s.start || 0)) + "] " + s.text.trim() : "").filter(Boolean).join("\n");
   }
 
-  async function chat(system, user, maxTokens, effort) {
-    const data = await groq("/chat/completions", {
-      model: useModel("groqLlm"),
+  // The report brain can be changed by the user (Compare brains). Merges and
+  // notes keep the default model.
+  const BRAIN_MODEL_KEY = "mia-brain";
+  const reportModel = () => { try { return localStorage.getItem(BRAIN_MODEL_KEY) || useModel("groqLlm"); } catch { return useModel("groqLlm"); } };
+  async function chat(system, user, maxTokens, effort, model) {
+    model = model || useModel("groqLlm");
+    const body = {
+      model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       temperature: 0.2,
-      max_completion_tokens: maxTokens,
-      reasoning_effort: effort || "low"
-    });
+      max_completion_tokens: maxTokens
+    };
+    // Only reasoning models accept this setting.
+    if (/gpt-oss|qwen3/i.test(model)) body.reasoning_effort = /qwen3/i.test(model) ? "default" : (effort || "low");
+    if (/qwen3/i.test(model)) body.reasoning_format = "hidden";
+    const data = await groq("/chat/completions", body);
+    if (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
+      data.choices[0].message.content = data.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "");
     return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
   }
 
@@ -780,6 +805,7 @@
     "RULES THAT OVERRIDE THE FORMAT ABOVE:",
     "- Include a section only if the recording actually contains material for it. Leave out sections that would be empty or guessed (no 'None' sections, except formal meeting minutes).",
     "- Never invent risks, actions, owners, deadlines, KPIs, advice, coaching or next steps that nobody said. Do not judge the speaker's feelings or performance.",
+    "- A 'decision' is only something people in the recording explicitly decided (e.g. 'we agreed', 'approved'). Someone describing what they did in the past is NOT a decision. An 'action' is only a task someone was asked or agreed to do.",
     "- Match the length to the recording: under 3 minutes of speech → a few sentences and at most 6 bullets; longer recordings → as long as the content needs.",
     "- If the transcript is too garbled to understand, say so in one line and summarise only what is clear.",
     "- For a personal story or casual talk: no Decisions, Actions or Next steps sections unless the speaker clearly stated them as such."
@@ -798,12 +824,13 @@
       "\nBe specific and complete: keep every number, name, date and instruction. No generic filler." +
       "\nUse only facts from the input. If a name, number or date is unclear, write [verify].\nOutput only the Markdown.";
     const tail = "\nWrite headings in the output language. Keep English terms in English as spoken.\nOutput only the Markdown.";
-    const field = FIELD_PROMPT + tail, smart = SMART_PROMPT + tail;
+    const field = FIELD_PROMPT + tail, smart = SMART_PROMPT + tail, story = STORY_PROMPT + tail;
     kind = kind || job.detectedKind || job.kind;
     if (kind === "meeting") return FINAL_PROMPT + "\n" + HONEST + lang;
     if (kind === "talk") return talk + "\n" + HONEST + lang;
     if (kind === "field") return field + "\n" + HONEST + lang;
     if (kind === "other") return smart + "\n" + HONEST + lang;
+    if (kind === "story") return story + "\n" + HONEST + lang;
     return "First decide what was recorded:\n" +
       "- MEETING: several people discussing, deciding, assigning work.\n" +
       "- TALK: one main speaker presenting, teaching, lecturing or briefing an audience.\n" +
@@ -813,7 +840,7 @@
       "If meeting:\n" + FINAL_PROMPT + "\n\nIf talk:\n" + talk + "\n\nIf field:\n" + field + "\n\nIf other:\n" + smart + "\n\n" + HONEST + lang;
   }
   function takeType(job, text) {
-    const m = text.match(/^\s*\**\s*(?:TYPE\s*:\s*)?(meeting|talk|field|other)\s*\**\s*(?::\s*|\n)/i);
+    const m = text.match(/^\s*\**\s*(?:TYPE\s*:\s*)?(meeting|talk|field|story|other)\s*\**\s*(?::\s*|\n)/i);
     if (m) { job.detectedKind = m[1].toLowerCase(); return text.slice(m[0].length).trim(); }
     if (job.kind !== "auto" && job.kind) job.detectedKind = job.kind;
     return text;
@@ -852,7 +879,8 @@
     "meeting = several people discussing, deciding, assigning work;",
     "talk = one main speaker teaching, lecturing, presenting or briefing an audience;",
     "field = one person dictating observations or notes on site (stock count, store visit, inspection, audit walk-through);",
-    "other = anything else (casual talk, phone call, interview, voice memo, brainstorm)."
+    "story = one person telling a story, anecdote or personal experience, or chatting casually;",
+    "other = anything else (phone call, interview, voice memo, brainstorm)."
   ].join("\n");
   async function detectKind(job) {
     if (job.kind && job.kind !== "auto") return job.kind;
@@ -860,10 +888,60 @@
     const sample = t.length > 6000 ? t.slice(0, 3000) + "\n...\n" + t.slice(Math.floor(t.length / 2), Math.floor(t.length / 2) + 1500) + "\n...\n" + t.slice(-1500) : t;
     try {
       const out = (await chat(CLASSIFY_PROMPT, sample, 400, "low")).toLowerCase();
-      const m = out.match(/\b(meeting|talk|field|other)\b/);
+      const m = out.match(/\b(meeting|talk|field|story|other)\b/);
       if (m) return m[1];
     } catch {}
     return "";
+  }
+
+  // ---------- Compare brains ----------
+  // Runs the same transcript through a few strong free models on the user's
+  // Groq account and shows the reports side by side; the user picks one.
+  const BRAIN_CANDIDATES = [/kimi-k2/i, /qwen3/i, /llama-4-maverick/i, /llama-3\.3-70b/i, /gpt-oss-120b/i, /gpt-oss/i];
+  function brainCandidates() {
+    const ids = (models.groqIds || []).filter(id => !/guard|whisper|tts|playai|compound|prompt|safety/i.test(id));
+    const out = [reportModel()];
+    for (const rx of BRAIN_CANDIDATES) {
+      const hit = ids.filter(id => rx.test(id)).sort(newer)[0];
+      if (hit && !out.includes(hit)) out.push(hit);
+      if (out.length >= 4) break;
+    }
+    return out;
+  }
+  const brainName = id => id.replace(/^[^/]+\//, "").replace(/-instruct.*$/i, "");
+  async function compareBrains(job) {
+    if (!getKey()) return openSetup();
+    if (!(job.transcript || "").trim()) return toast("There's no transcript yet.");
+    if (!(models.groqIds || []).length) await refreshModels(true);
+    const list = brainCandidates();
+    const d = $("compareDialog");
+    const res = {};
+    let shown = list[0];
+    const draw = () => {
+      $("compareTabs").innerHTML = list.map(m => '<button type="button" data-model="' + esc(m) + '" aria-pressed="' + (m === shown) + '">' + esc(brainName(m)) + (m === reportModel() ? " · current" : "") + "</button>").join("");
+      const r = res[shown];
+      $("compareBody").innerHTML = r == null ? '<p class="row-note">Writing with ' + esc(brainName(shown)) + "…</p>" : r.error ? '<p class="row-note">Failed: ' + esc(r.error) + "</p>" : renderMinutes(r.text);
+      $("compareUse").disabled = !(r && r.text);
+      $("compareUse").textContent = shown === reportModel() ? "Keep this brain" : "Use " + brainName(shown) + " from now on";
+    };
+    $("compareTabs").onclick = e => { const b = e.target.closest("[data-model]"); if (b) { shown = b.dataset.model; draw(); } };
+    $("compareUse").onclick = async () => {
+      const r = res[shown]; if (!r || !r.text) return;
+      try { localStorage.setItem(BRAIN_MODEL_KEY, shown); } catch {}
+      if (job.minutes && !job.minutesMia) job.minutesMia = job.minutes;
+      job.minutes = r.text; job.brainModel = shown;
+      await saveJob(job); d.close(); render(); renderModels();
+      toast("Reports now use " + brainName(shown) + ".");
+    };
+    draw();
+    if (!d.open) d.showModal();
+    const kind = job.detectedKind || await detectKind(job);
+    const text = job.transcript.length > 14000 ? job.transcript.slice(0, 14000) : job.transcript;
+    for (const m of list) {
+      try { res[m] = { text: takeType({ ...job }, await chat(finalPrompt(job, kind), "Transcript:\n" + text, 4000, "medium", m)) }; }
+      catch (e) { res[m] = { error: e && e.message || "error" }; }
+      if (d.open) draw();
+    }
   }
 
   async function writeMinutes(job) {
@@ -879,7 +957,7 @@
       catch (e) { warnJob(job, why(e, "OpenAI report") + " → used the free brain"); toast("OpenAI couldn't write the report. Using the free brain."); }
     }
     job.brain = "groq";
-    if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 4000, "medium"));
+    if (transcript.length <= ONE_SHOT_CHARS) return takeType(job, await chat(prompt, "Transcript:\n" + transcript, 4000, "medium", reportModel()));
     let notes;
     if ((job.parts || []).some(p => p && p.notes)) {
       notes = job.parts.map((p, i) => "Part " + (i + 1) + " (from " + stamp(i * PART_SECONDS) + "):\n" + (p.notes || ""));
@@ -904,7 +982,7 @@
       for (const g of groups) merged.push(await chat(PART_PROMPT, "Merge these notes. Group them by topic (not time order): a point that returns to an earlier topic goes under that topic. Keep every decision, action, risk and key point, the (mm:ss) times, and any later corrections:\n\n" + g.join("\n\n"), 900));
       notes = merged;
     }
-    return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 4000, "medium"));
+    return takeType(job, await chat(prompt, "Notes, in order:\n\n" + notes.join("\n\n"), 4000, "medium", reportModel()));
   }
 
   let running = null;
@@ -1501,6 +1579,8 @@
     $("workGo").addEventListener("click", go);
     $("writeMinutes").addEventListener("click", go);
     $("refineClaude").addEventListener("click", () => act("copySummary"));
+    $("compareBtn").addEventListener("click", () => { const j = state.jobs.find(x => x.id === state.openId); if (j) compareBrains(j).catch(e => toast(e.message)); });
+    $("compareClose").addEventListener("click", () => $("compareDialog").close());
     $("stGroq").addEventListener("click", () => { if (!getKey()) openSetup(); });
     renderDiag();
     $("diagCopy").addEventListener("click", () => { let t = ""; try { t = JSON.parse(localStorage.getItem("mia-diag") || "[]").join("\n"); } catch {} copyText(t || "No problems recorded.", "Copied. Paste it in the chat with Claude."); });
