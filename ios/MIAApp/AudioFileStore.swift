@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 
 /// Stores meeting audio inside the app's private Documents directory.
+/// iOS file protection is applied; this is not a substitute for a full encrypted vault.
 final class AudioFileStore {
     private let fileManager = FileManager.default
     private let folderName = "MIARecordings"
@@ -17,6 +18,7 @@ final class AudioFileStore {
             at: recordingsDirectory,
             withIntermediateDirectories: true
         )
+        try protectAudioFile(at: recordingsDirectory)
         try removeExpiredAudio()
     }
 
@@ -37,6 +39,7 @@ final class AudioFileStore {
         let fileName = "\(id.uuidString).\(fileExtension)"
         let destination = recordingsDirectory.appendingPathComponent(fileName)
         try fileManager.copyItem(at: sourceURL, to: destination)
+        try protectAudioFile(at: destination)
 
         var manifest = RecordingManifest(
             id: id,
@@ -56,6 +59,7 @@ final class AudioFileStore {
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(manifest).write(to: url, options: .atomic)
+        try protectAudioFile(at: url)
     }
 
     func loadAll() throws -> [RecordingManifest] {
@@ -88,11 +92,22 @@ final class AudioFileStore {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
+    func protectAudioFile(at url: URL) throws {
+        try fileManager.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? url.setResourceValues(values)
+    }
+
     private func prepareDirectoryOnly() throws {
         try fileManager.createDirectory(
             at: recordingsDirectory,
             withIntermediateDirectories: true
         )
+        try protectAudioFile(at: recordingsDirectory)
     }
 
     private func removeExpiredAudio() throws {
