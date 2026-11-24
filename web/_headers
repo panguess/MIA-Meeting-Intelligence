@@ -5,3 +5,9 @@
   Permissions-Policy: microphone=(self), camera=(), geolocation=()
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
   Strict-Transport-Security: max-age=31536000
+
+/index.html
+  Cache-Control: no-store
+
+/sw.js
+  Cache-Control: no-cache
