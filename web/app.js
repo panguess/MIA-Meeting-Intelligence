@@ -624,6 +624,8 @@
         const stoppedByUser = state.userStopped;
         const marks = (state.marks || []).slice();
         const liveText = liveStop();
+        const preCount = await segStop();
+        levelStop();
         await state.chunkWriteQueue;
         const rows = recordingId ? await getChunks(recordingId) : [];
         const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -677,7 +679,7 @@
           // the Agent then gets this first part only when they tap Minutes.
           const handOff = (stay = false) => {
             if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
-            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText, series: sessionRows && sessionRows.series, gapSec: sessionRows && sessionRows.gapSec }))
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText, series: sessionRows && sessionRows.series, gapSec: sessionRows && sessionRows.gapSec, pre: preCount ? recordingId : null, preCount }))
               .catch(error => showWarning("The recording is saved, but the report didn't start (" + (error?.message || error?.name || "storage error") + "). Open Agent and tap the recording to try again."));
           };
           if (!stoppedByUser) {
@@ -701,6 +703,9 @@
       });
 
       recorder.start(1000);
+      segStart(stream, mimeType, state.recordingId);
+      levelStart(stream);
+      liveRender();
       setStatus(t("recordingStarted"), true);
       startTimer();
       await acquireWakeLock();
@@ -723,7 +728,10 @@
   // ends each recognition session after a short while or a pause, so it is
   // restarted for as long as the recording runs. The audio is still recorded
   // as a backup ("Improve accuracy" re-listens to it).
-  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // Apple's live speech-to-text is OFF: on iPhone it takes over the microphone,
+  // so the real recording became silent. The good engines now transcribe the
+  // audio in the background every 2 minutes instead (see "Segments" below).
+  const Speech = null;
   const live = { rec: null, on: false, lines: [], interim: "", failed: "", lastEvent: 0, dog: null, id: null, all: new Set() };
   // Live lines are also kept in localStorage while recording, so a crash or an
   // iOS reload keeps the text of the recovered part.
@@ -734,12 +742,105 @@
   function liveTake(id) {
     try { const raw = localStorage.getItem(liveKey(id)); localStorage.removeItem(liveKey(id)); return raw ? liveAsText(JSON.parse(raw)) : ""; } catch { return ""; }
   }
+  // ---------- Segments: transcribe while recording ----------
+  // A second recorder on the same microphone closes a small file every
+  // 2 minutes and hands it to the Agent, which transcribes it right away with
+  // Whisper + Typhoon. At Stop only the last piece is left, so the report comes
+  // quickly and from the accurate engines. The main recording is untouched.
+  const SEG_SECONDS = (() => { try { return Number(localStorage.getItem("mia-seg-seconds")) || 120; } catch { return 120; } })();
+  const seg = { rec: null, idx: 0, delivered: 0, startAt: 0, timer: null, rid: null, mime: "", off: false, done: null, text: "" };
+  function segOne() {
+    const r = new MediaRecorder(state.stream, { mimeType: seg.mime, audioBitsPerSecond: 64000 });
+    const parts = [], idx = seg.idx++, offset = seg.startAt, rid = seg.rid;
+    r.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+    r.onstop = () => {
+      const blob = new Blob(parts, { type: r.mimeType || seg.mime });
+      if (blob.size && window.MIAAgent && window.MIAAgent.preSegment) window.MIAAgent.preSegment(rid, idx, blob, offset);
+      else seg.idx = -1;   // a missing piece: the Agent re-listens to the whole recording instead
+      seg.delivered++;
+      if (seg.done && seg.delivered >= seg.idx) seg.done();
+    };
+    r.start(1000);
+    seg.rec = r;
+  }
+  function segStart(stream, mime, rid) {
+    clearInterval(seg.timer);
+    Object.assign(seg, { rec: null, idx: 0, delivered: 0, startAt: 0, rid, mime, off: false, done: null, text: "" });
+    if (!window.MIAAgent || !window.MIAAgent.preReady || !window.MIAAgent.preReady()) { seg.off = true; return; }
+    try { segOne(); } catch { seg.off = true; return; }
+    seg.timer = setInterval(() => {
+      if (!state.recorder || state.recorder.state !== "recording" || !seg.rec) return;
+      const now = elapsedSeconds();
+      if (now - seg.startAt < SEG_SECONDS) return;
+      const old = seg.rec;
+      seg.startAt = now;
+      try { segOne(); } catch { seg.off = true; }
+      try { old.stop(); } catch {}
+    }, 2000);
+  }
+  function segStop() {
+    clearInterval(seg.timer);
+    if (seg.off || !seg.rec) return Promise.resolve(0);
+    return new Promise(resolve => {
+      const finish = () => { seg.done = null; resolve(seg.idx > 0 ? seg.idx : 0); };
+      seg.done = finish;
+      try { seg.rec.state !== "inactive" ? seg.rec.stop() : finish(); } catch { finish(); }
+      seg.rec = null;
+      setTimeout(finish, 4000);
+    });
+  }
+  // The Agent calls this as each piece is transcribed.
+  window.MIAPreview = (rid, text) => {
+    if (rid !== seg.rid) return;
+    seg.text = text || "";
+    liveRender();
+  };
+
+  // ---------- Microphone level: warn if MIA only hears silence ----------
+  const level = { ctx: null, an: null, timer: null, quietSince: 0, warned: false };
+  function levelStart(stream) {
+    levelStop();
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      level.ctx = new Ctx();
+      level.ctx.resume && level.ctx.resume().catch(() => {});
+      level.an = level.ctx.createAnalyser();
+      level.an.fftSize = 1024;
+      level.ctx.createMediaStreamSource(stream).connect(level.an);
+    } catch { return; }
+    const buf = new Float32Array(level.an.fftSize);
+    level.quietSince = Date.now(); level.warned = false;
+    level.timer = setInterval(() => {
+      if (!level.an || !state.recorder || state.pausedAt) { level.quietSince = Date.now(); return; }
+      if (level.ctx.state !== "running") return;   // can't measure: never warn by mistake
+      level.an.getFloatTimeDomainData(buf);
+      let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      const bar = el("levelFill");
+      if (bar) bar.style.width = Math.min(100, Math.round(rms * 600)) + "%";
+      if (rms > 0.004) { level.quietSince = Date.now(); if (level.warned) { level.warned = false; clearWarning(); } return; }
+      if (!level.warned && Date.now() - level.quietSince > 12000) {
+        level.warned = true;
+        showWarning("MIA hears only silence. Check that no other app is using the microphone and that nothing covers it.");
+        try { window.MIAAgent && window.MIAAgent.diag && window.MIAAgent.diag("Recording was silent for 12 s"); } catch {}
+      }
+    }, 500);
+  }
+  function levelStop() {
+    clearInterval(level.timer); level.timer = null;
+    try { level.ctx && level.ctx.close(); } catch {}
+    level.ctx = null; level.an = null;
+    const bar = el("levelFill"); if (bar) bar.style.width = "0%";
+  }
+
   function liveRender() {
     const box = el("liveBox");
     if (!box) return;
-    box.classList.toggle("hidden", !live.on && !live.lines.length);
+    const recording = !!state.recorder;
+    box.classList.toggle("hidden", !recording);
+    const pre = (seg.text || "").split("\n").filter(Boolean).slice(-3).map(l => l.replace(/^\[[\d:]+\]\s*/, "")).join(" ");
     const last = live.lines.slice(-3).map(l => l.text).join(" ");
-    el("liveText").textContent = (last + (live.interim ? " " + live.interim : "")).trim() || (live.failed || "Listening…");
+    el("liveText").textContent = (pre || last).trim() || (seg.off ? "Recording… the transcript is made after Stop." : "Recording… the first transcript appears after about 2 minutes.");
   }
   function liveStart(id) {
     live.lines = []; live.interim = ""; live.failed = ""; live.id = id || null;
@@ -865,11 +966,13 @@
     try {
       if (recorder.state === "recording") {
         recorder.pause();
+        try { seg.rec && seg.rec.state === "recording" && seg.rec.pause(); } catch {}
         state.pausedAt = Date.now();
         livePause(true);
         setStatus(t("paused"), true);
       } else if (recorder.state === "paused") {
         recorder.resume();
+        try { seg.rec && seg.rec.state === "paused" && seg.rec.resume(); } catch {}
         state.pausedTotal += Date.now() - (state.pausedAt || Date.now());
         state.pausedAt = null;
         livePause(false);

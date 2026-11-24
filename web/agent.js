@@ -912,6 +912,90 @@
     if (window.MIABackup) window.MIABackup.jobDone();
   }
 
+  // One piece of audio → best transcript: OpenAI if on, otherwise Whisper and
+  // Typhoon in parallel, then merged (or cleaned) by the brain.
+  async function listenPart(job, p, out, tag, mFrom, mTo) {
+          let best = "";
+          if (getOpenAIKey() && !job.oaWarned) {
+            best = await openaiPart(p).catch(e => { if (!job.oaWarned) { job.oaWarned = true; warnJob(job, why(e, "OpenAI") + " → used the free engines"); toast("OpenAI didn't answer. Using the free engines."); } return ""; });
+          }
+          if (best) {
+            out.raw = best; out.text = best; job.engine = "openai";
+          } else {
+          // Whisper (Groq) and, if connected, Typhoon listen to the same part.
+          const [raw, thai] = await Promise.all([
+            transcribePart(p.blob, p.offset, job.lang, p.name),
+            getTyphoonKey() ? typhoonPart(p).catch(e => { if (!job.tyWarned) { job.tyWarned = true; warnJob(job, why(e, "Typhoon") + " → used Whisper only"); toast("Typhoon didn't answer. Using Whisper only (see the note on this job)."); } return ""; }) : Promise.resolve("")
+          ]);
+          out.raw = raw;
+          out.thai = thai;
+          out.text = raw;
+          job.engine = thai ? "typhoon+whisper" : "whisper";
+          // Second pass: merge with Typhoon, or fix misheard words from context.
+          // Kept only if it keeps the time stamps and roughly the same length.
+          if (raw.trim()) {
+            try {
+              if (mTo != null) setStep(job, tag + (thai ? "Merging both versions" : "Fixing misheard words"), mFrom, mTo, 20);
+              const terms = getTerms();
+              const termNote = terms ? "\nNames and terms that may appear: " + terms : "";
+              const fixed = thai
+                ? await chat(MERGE_PROMPT + termNote, "Transcript A (Whisper):\n" + raw + "\n\nTranscript B (Typhoon):\n" + thai, 3500)
+                : await chat(CLEAN_PROMPT + termNote, raw, 3000);
+              const stamps = t => (t.match(/^\[\d/gm) || []).length;
+              if (fixed && stamps(fixed) >= stamps(raw) * 0.8 && fixed.length > raw.length * 0.6 && fixed.length < raw.length * 1.6) out.text = fixed;
+            } catch (e) { if (e instanceof KeyError) throw e; }
+          }
+          }
+  }
+
+  // ---------- Background transcription while recording ----------
+  // The Record tab sends a small audio file every 2 minutes. Each one is
+  // transcribed at once (same engines as below), one after another. At Stop
+  // the job only waits for the last piece, then writes the report.
+  const pre = {};
+  const preReady = () => !!getKey();
+  function preText(rid) {
+    const P = pre[rid];
+    return P ? P.segs.filter(x => x && x.text).map(x => x.text).join("\n") : "";
+  }
+  function preSegment(rid, idx, blob, offset) {
+    if (!getKey() || !rid) return;
+    const P = pre[rid] = pre[rid] || { segs: [], chain: Promise.resolve(), ctx: { id: "pre-" + rid, background: true, warnings: [], lang: state.lang } };
+    P.segs[idx] = { offset, text: null };
+    P.chain = P.chain.then(async () => {
+      try {
+        const split = await splitAudio(blob);
+        const texts = [];
+        for (let k = 0; k < split.count; k++) {
+          const p = split.part(k);
+          p.offset = offset + (p.offset || 0);
+          const out = {};
+          await listenPart(P.ctx, p, out, "", null, null);
+          if (out.text) texts.push(out.text);
+        }
+        P.segs[idx].text = texts.join("\n");
+      } catch (e) {
+        P.segs[idx].failed = true;
+        diag(why(e, "Background transcription of minute " + Math.round(offset / 60)));
+      }
+      if (window.MIAPreview) window.MIAPreview(rid, preText(rid));
+    });
+  }
+  // Used by processJob: the transcript from the background pieces, or null if
+  // any piece is missing (then the whole recording is transcribed as before).
+  async function takePre(job) {
+    const P = pre[job.preId];
+    if (!P) return null;
+    await P.chain;
+    const ok = job.preCount > 0 && P.segs.length === job.preCount && P.segs.every(x => x && x.text != null && !x.failed);
+    if (!ok) { diag("Background transcript incomplete (" + P.segs.filter(x => x && x.text != null).length + "/" + job.preCount + "), re-listening to the whole recording"); return null; }
+    (P.ctx.warnings || []).forEach(w => warnJob(job, w));
+    job.engine = P.ctx.engine;
+    const text = preText(job.preId);
+    delete pre[job.preId];
+    return text;
+  }
+
   // ---------- Live progress ----------
   // Each step has a label, a % range and a typical duration. Between real
   // updates the % keeps creeping forward (never past the step's end), so the
@@ -921,6 +1005,7 @@
   function setStep(job, label, from, to, typicalSec) {
     job.step = label; job.stepFrom = from; job.stepTo = to; job.stepSec = typicalSec || 20; job.stepAt = Date.now();
     job.progress = Math.max(job.progress || 0, from);
+    if (job.background) return;
     if (!ticker) ticker = setInterval(tickProgress, 1000);
     tickProgress();
   }
@@ -990,15 +1075,24 @@
     job.status = "working"; job.error = ""; job.oaWarned = false; job.tyWarned = false;
     job.workStart = Date.now(); job.progress = 0; job.stuck = false; job.warnings = [];
     setStep(job, "Getting ready", 0, 3, 3);
+    job.reportFrom = null;
     await saveJob(job); render();
     const t0 = Date.now();
     let stepsDone = 0;
     try {
+      if (job.preId && !job.transcriptComplete && pre[job.preId]) {
+        setStep(job, "Finishing the last 2 minutes", 3, 80, 25);
+        const text = await takePre(job);
+        if (text && text.trim()) {
+          job.transcript = text; job.transcriptComplete = true; job.source = "pre"; job.reportFrom = 80;
+          await saveJob(job);
+        }
+      }
       if (job.transcriptComplete) {
         if (job.parentId) return await childDone(job);
         if (job.ownTranscript == null) job.ownTranscript = job.transcript;
         composeSeries(job);
-        job.stage = "minutes"; job.reportFrom = 5; render();
+        job.stage = "minutes"; job.reportFrom = job.reportFrom || 5; render();
         job.minutes = await writeMinutes(job);
         job.status = "done"; job.progress = 100; job.stage = "";
         await saveJob(job);
@@ -1026,37 +1120,7 @@
           const p = split.part(i);
           // OpenAI first if the user turned it on; Groq Whisper (+Typhoon) otherwise
           // or if OpenAI fails.
-          let best = "";
-          if (getOpenAIKey() && !job.oaWarned) {
-            best = await openaiPart(p).catch(e => { if (!job.oaWarned) { job.oaWarned = true; warnJob(job, why(e, "OpenAI") + " → used the free engines"); toast("OpenAI didn't answer. Using the free engines."); } return ""; });
-          }
-          if (best) {
-            job.parts[i].raw = best; job.parts[i].text = best; job.engine = "openai";
-          } else {
-          // Whisper (Groq) and, if connected, Typhoon listen to the same part.
-          const [raw, thai] = await Promise.all([
-            transcribePart(p.blob, p.offset, job.lang, p.name),
-            getTyphoonKey() ? typhoonPart(p).catch(e => { if (!job.tyWarned) { job.tyWarned = true; warnJob(job, why(e, "Typhoon") + " → used Whisper only"); toast("Typhoon didn't answer. Using Whisper only (see the note on this job)."); } return ""; }) : Promise.resolve("")
-          ]);
-          job.parts[i].raw = raw;
-          job.parts[i].thai = thai;
-          job.parts[i].text = raw;
-          job.engine = thai ? "typhoon+whisper" : "whisper";
-          // Second pass: merge with Typhoon, or fix misheard words from context.
-          // Kept only if it keeps the time stamps and roughly the same length.
-          if (raw.trim()) {
-            try {
-              setStep(job, tag + (thai ? "Merging both versions" : "Fixing misheard words"), pr(i, 0.6), pr(i, long ? 0.85 : 1), 20);
-              const terms = getTerms();
-              const termNote = terms ? "\nNames and terms that may appear: " + terms : "";
-              const fixed = thai
-                ? await chat(MERGE_PROMPT + termNote, "Transcript A (Whisper):\n" + raw + "\n\nTranscript B (Typhoon):\n" + thai, 3500)
-                : await chat(CLEAN_PROMPT + termNote, raw, 3000);
-              const stamps = t => (t.match(/^\[\d/gm) || []).length;
-              if (fixed && stamps(fixed) >= stamps(raw) * 0.8 && fixed.length > raw.length * 0.6 && fixed.length < raw.length * 1.6) job.parts[i].text = fixed;
-            } catch (e) { if (e instanceof KeyError) throw e; }
-          }
-          }
+          await listenPart(job, p, job.parts[i], tag, pr(i, 0.6), pr(i, long ? 0.85 : 1));
           stepsDone++;
           job.heard = stamp(Math.min(job.duration || Infinity, (i + 1) * PART_SECONDS));
           const lines = job.parts[i].text.split("\n");
@@ -1183,6 +1247,7 @@
         duration: opts.duration || await audioDuration(blob),
         status: "queued", progress: 0, transcript: "", minutes: "", parts: [], ...liveFields(opts)
       };
+      if (opts.pre && opts.preCount) { job.preId = opts.pre; job.preCount = opts.preCount; }
       if (parent) {
         job.parentId = parent.id; job.gapSec = opts.gapSec || 0;
         parent.childIds = [...(parent.childIds || []), job.id];
@@ -1466,7 +1531,7 @@
   }
 
   // Small hook for tests and screenshots.
-  window.MIAAgent = { saveJob, toast, openaiKey: getOpenAIKey, typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
+  window.MIAAgent = { saveJob, toast, diag, preSegment, preReady, openaiKey: getOpenAIKey, typhoonKey: getTyphoonKey, busy: () => !!running, state, render, renderMinutes, renderTranscript, transcriber: TRANSCRIBER, addAudio, showView };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
