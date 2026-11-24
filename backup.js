@@ -208,6 +208,8 @@
     const id = clientId(), A = agent();
     const pending = A ? A.state.jobs.filter(needsBackup).length : 0;
     $("gdState").textContent = !id ? "Off" : busy ? "Working…" : pending ? pending + " waiting" : "Up to date";
+    const st = $("stGd");
+    if (st) { st.classList.toggle("ok", !!id && !pending); st.querySelector(".st-val").textContent = !id ? "Off" : pending ? pending + " to back up" : "✓ Up to date"; }
     $("gdButtons").classList.toggle("hidden", !id);
     $("gdBackup").disabled = $("gdRestore").disabled = busy;
     $("gdAudio").checked = audioOn();

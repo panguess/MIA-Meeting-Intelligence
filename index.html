@@ -315,6 +315,22 @@
     .svc-btn{border:var(--line);background:var(--ink);color:#fff;border-radius:999px;min-height:44px;padding:0 14px;font-weight:800;font-size:14px;white-space:nowrap}
     .refine{display:flex;flex-direction:column;gap:8px;background:var(--lilac);border:var(--line);border-radius:22px;padding:14px;margin-bottom:4px}
     .refine .btn{background:#fff;color:var(--ink);min-height:50px;font-size:17px}
+    .set-h{font-family:var(--display);font-size:16px;margin:6px 4px 8px}
+    .status-list{list-style:none;margin:0 0 6px;padding:0;border:var(--line);border-radius:22px;overflow:hidden;background:#fff}
+    .status-list li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:var(--line)}
+    .status-list li:first-child{border-top:0}
+    .status-list li>span:nth-child(2){flex:1;display:flex;flex-direction:column}
+    .status-list small{font-size:12px;color:var(--muted);font-weight:700}
+    .st-dot{width:14px;height:14px;border-radius:50%;background:#ddd;border:2px solid var(--ink);flex:none}
+    .status-list li.ok .st-dot{background:var(--mint)}
+    .status-list li.need .st-dot{background:var(--coral)}
+    .st-val{font-size:13px;white-space:nowrap}
+    .set-more{border:var(--line);border-radius:22px;padding:4px 12px;margin:10px 0;background:var(--cream)}
+    .set-more summary{cursor:pointer;font-weight:800;padding:10px 2px;list-style:none}
+    .set-more summary::-webkit-details-marker{display:none}
+    .set-more summary::after{content:" ▾"}
+    .set-more[open] summary::after{content:" ▴"}
+    .set-more[open]{padding-bottom:10px}
     .more-menu{margin-top:6px}
     .more-menu summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--muted);padding:8px 4px;list-style:none}
     .more-menu summary::-webkit-details-marker{display:none}
@@ -402,7 +418,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.15.1</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.15.2</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -476,7 +492,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.15.1</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.15.2</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -593,13 +609,17 @@
   <dialog class="sheet" id="settingsDialog" aria-labelledby="settingsTitle">
    <div class="sheet-head"><h2 id="settingsTitle">Settings</h2><button class="sheet-close" id="settingsClose" type="button">Done</button></div>
    <div class="sheet-body">
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="tyKey"><strong>Typhoon key · Thai accuracy</strong><span>Typhoon by SCB 10X · free · <b id="tyState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon key here"><button id="tySave" type="button">Save</button></div>
-   <a class="link-btn settings-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
+   <h3 class="set-h">Status</h3>
+   <ul class="status-list">
+    <li id="stGroq"><span class="st-dot" aria-hidden="true"></span><span><strong>Speech &amp; reports</strong><small>Groq · free · needed</small></span><b class="st-val">…</b></li>
+    <li id="stTy"><span class="st-dot" aria-hidden="true"></span><span><strong>Thai accuracy boost</strong><small>Typhoon · free · recommended</small></span><b class="st-val">…</b></li>
+    <li id="stGd"><span class="st-dot" aria-hidden="true"></span><span><strong>Backup</strong><small>Your Google Drive · free · optional</small></span><b class="st-val">…</b></li>
+   </ul>
+   <p class="set-note">Green means done. You don't need to set anything else.</p>
+
+   <h3 class="set-h">Your preferences</h3>
    <section class="lang-row">
-    <span class="lang-text"><strong>Minutes language</strong><span>Meetings are heard as Thai + English</span></span>
+    <span class="lang-text"><strong>Report language</strong><span>Recordings can be Thai, English or both</span></span>
     <div class="pill-toggle" id="agentOut" role="group" aria-label="Minutes language">
     <button type="button" data-out="th" aria-pressed="true">Thai</button>
     <button type="button" data-out="en" aria-pressed="false">English</button>
@@ -609,28 +629,44 @@
     <label class="lang-text" for="agentTerms"><strong>Names &amp; terms</strong><span>Helps spell people, projects and jargon right</span></label>
    </section>
    <input class="terms-input" id="agentTerms" type="text" maxlength="300" placeholder="e.g. Nattaya, Siam Piwat, ERM, KRI" autocomplete="off">
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="oaKey"><strong>OpenAI key · best accuracy</strong><span>Optional · paid, about 10 THB per hour of audio · <b id="oaState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="oaKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste OpenAI key (sk-…)"><button id="oaSave" type="button">Save</button></div>
-   <p class="set-note">Leave empty to stay free. Save an empty field to turn it off.</p>
-   <label class="set-note gd-audio hidden" id="oaBrainRow"><input type="checkbox" id="oaBrain"> Also let OpenAI write the reports · ChatGPT-level, about 3-5 THB per report</label>
 
-   <section class="lang-row terms-row">
-    <label class="lang-text" for="gdClient"><strong>Backup · your Google Drive</strong><span>Optional · free · <b id="gdState">Off</b></span></label>
-   </section>
-   <div class="ty-row"><input id="gdClient" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Google Client ID"><button id="gdSave" type="button">Save</button></div>
-   <div class="export-row hidden" id="gdButtons"><button class="btn" id="gdBackup" type="button">Back up now</button><button class="btn" id="gdRestore" type="button">Restore</button></div>
-   <label class="set-note gd-audio"><input type="checkbox" id="gdAudio"> Also back up audio (uses more Drive space)</label>
-   <p class="set-note" id="gdNote"></p>
-   <p class="set-note" id="storeNote"></p>
-
+   <details class="set-more">
+    <summary>Connect or change keys</summary>
    <section class="svc" id="svcCard">
     <span class="svc-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 5 14h6l-1 7 8-11h-6Z"/></svg></span>
     <span class="svc-text"><strong>Speech-to-text &amp; minutes</strong><span>Groq free plan · <span class="detail-pill" id="svcState">Not set up</span></span></span>
     <button class="svc-btn" id="svcButton" type="button">Set up · free</button>
    </section>
    <button class="link-btn settings-link hidden" id="svcLink" type="button">Change Groq key</button>
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="tyKey"><strong>Typhoon key</strong><span>Free · from SCB 10X (Thai AI company) · <b id="tyState">Off</b></span></label>
+   </section>
+   <div class="ty-row"><input id="tyKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Typhoon key here"><button id="tySave" type="button">Save</button></div>
+   <a class="link-btn settings-link" href="https://playground.opentyphoon.ai/api-key" target="_blank" rel="noopener noreferrer">Get a free Typhoon key</a>
+   </details>
+
+   <details class="set-more">
+    <summary>Backup to Google Drive · optional</summary>
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="gdClient"><strong>Google Client ID</strong><span>Free · <b id="gdState">Off</b></span></label>
+   </section>
+   <div class="ty-row"><input id="gdClient" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste Google Client ID"><button id="gdSave" type="button">Save</button></div>
+   <div class="export-row hidden" id="gdButtons"><button class="btn" id="gdBackup" type="button">Back up now</button><button class="btn" id="gdRestore" type="button">Restore</button></div>
+   <label class="set-note gd-audio"><input type="checkbox" id="gdAudio"> Also back up audio (uses more Drive space)</label>
+   <p class="set-note" id="gdNote"></p>
+   </details>
+   <p class="set-note" id="storeNote"></p>
+
+   <details class="set-more">
+    <summary>Advanced · paid, optional (not needed)</summary>
+   <section class="lang-row terms-row">
+    <label class="lang-text" for="oaKey"><strong>OpenAI key</strong><span>Paid, about 10 THB per hour · <b id="oaState">Off</b></span></label>
+   </section>
+   <div class="ty-row"><input id="oaKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste OpenAI key (sk-…)"><button id="oaSave" type="button">Save</button></div>
+   <p class="set-note">You don't need this. MIA works fully for free without it. To turn it off, clear the box and tap Save.</p>
+   <label class="set-note gd-audio hidden" id="oaBrainRow"><input type="checkbox" id="oaBrain"> Also let OpenAI write the reports · ChatGPT-level, about 3-5 THB per report</label>
+   </details>
+
   <details class="limits">
     <summary><h2 id="limitsTitle">Tips for a complete recording</h2><span class="chev" aria-hidden="true">+</span></summary>
     <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
@@ -651,7 +687,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.15.1</p>
+    <p>MIA prototype · v0.15.2</p>
   </div>
    </div>
   </dialog>
