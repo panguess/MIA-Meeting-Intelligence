@@ -20,7 +20,7 @@ A maintainer can test the microphone and Home Screen install on a real iPhone ov
 2. Optional: tap **Share → Add to Home Screen** for an icon.
 3. Keep MIA open in Safari or from its Home Screen icon, with the screen unlocked.
 4. Enter a meeting name if useful, then tap **Start recording** and allow microphone access.
-5. Tap **Stop and save** when finished. Play the recording and use **Export** to save a separate copy to Files.
+5. Tap **Stop & save** when finished. Play the recording and use **Export** to save a separate copy to Files.
 6. Delete recordings you no longer need. Export important audio after each meeting.
 
 For an online meeting, place the iPhone near the laptop speaker. MIA records sound through the iPhone microphone; it does not connect to Teams, Zoom, or Meet.
@@ -38,6 +38,6 @@ For an online meeting, place the iPhone near the laptop speaker. MIA records sou
 
 ## Current scope
 
-Implemented: live microphone recording, local IndexedDB storage, recovery of saved chunks, optional local audio import, playback, export, deletion, and Thai/English labels.
+Implemented: live microphone recording, local IndexedDB storage, recovery of saved chunks, optional local audio import, playback, export, deletion, rename, and an English interface designed for iPhone.
 
 Not implemented: transcription, summaries, action items, cloud sync, remote processing, meeting-platform connection, guaranteed background recording, or a hosted production URL.

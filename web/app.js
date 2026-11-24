@@ -9,142 +9,94 @@
   const RETENTION_DAYS = 90;
   const MAX_RECORDING_BYTES = 1024 * 1024 * 1024; // 1 GiB guardrail; actual browser quota may be lower.
 
+  // All interface text, in English. Keep strings short and plain.
   const translations = {
-    th: {
-      tagline: "บันทึกการประชุมอย่างเป็นส่วนตัว",
-      capture: "การบันทึกเสียง · ผ่าน iPhone เท่านั้น",
-      ready: "พร้อมบันทึก",
-      recording: "กำลังบันทึก",
-      meetingTitle: "ชื่อการประชุม",
-      start: "เริ่มบันทึก",
-      stop: "หยุดและบันทึก",
-      onlineTitle: "การประชุมออนไลน์",
-      onlineCopy: "เปิด Teams บน Laptop แล้ววาง iPhone ใกล้ลำโพงเพื่อบันทึกเสียงจากห้องประชุม MIA ไม่ได้เชื่อมต่อกับ Teams โดยตรง",
-      importTitle: "นำเข้าไฟล์เสียง",
-      importCopy: "เลือกไฟล์เสียงจาก iPhone Files เพื่อเก็บไว้ใน MIA โดยไม่มีการอัปโหลดออกจากอุปกรณ์",
-      chooseFile: "เลือกไฟล์เสียง",
-      library: "ไฟล์เสียงในอุปกรณ์",
-      empty: "ยังไม่มีไฟล์เสียง",
-      privacy: "MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เตือนเมื่อไฟล์เก่าเกิน 90 วันแต่ไม่ลบเอง · ไม่มี Cloud AI หรือการส่งข้อมูลออก",
-      micDenied: "ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน โปรดอนุญาตใน Settings ของ Safari",
-      micUnsupported: "เบราว์เซอร์นี้ไม่รองรับการบันทึกเสียงที่จำเป็น กรุณาใช้ Safari รุ่นปัจจุบัน",
-      recordingStarted: "กำลังบันทึกเสียงบนอุปกรณ์นี้",
-      saved: "บันทึกไฟล์เสียงไว้ในอุปกรณ์แล้ว",
-      imported: "นำเข้าไฟล์เสียงแล้ว",
-      importFailed: "นำเข้าไฟล์ไม่สำเร็จ",
-      storageFailed: "บันทึกไฟล์ไม่สำเร็จ พื้นที่เบราว์เซอร์อาจไม่เพียงพอ",
-      interruption: "ตรวจพบว่าแอปออกจากหน้าจอ อาจมีเสียงขาดหาย กรุณาอย่าล็อกหน้าจอหรือสลับแอประหว่างบันทึก",
-      trackMuted: "ไมโครโฟนถูกพักโดยระบบ iOS จึงหยุดบันทึกและเก็บไฟล์บางส่วนไว้ให้ตรวจสอบ",
-      trackEnded: "ไมโครโฟนหยุดทำงาน ระบบจึงหยุดบันทึกเพื่อป้องกันไฟล์ที่ไม่มีเสียง",
-      routeHint: "หากเปลี่ยนอุปกรณ์เสียง อาจมีช่วงเสียงขาดหาย",
-      deleteConfirm: "ลบไฟล์เสียงนี้ออกจากอุปกรณ์หรือไม่?",
-      deleteConfirmUnexported: "ไฟล์นี้ยังไม่เคยส่งออก ถ้าลบแล้วจะกู้คืนไม่ได้ ต้องการลบหรือไม่?",
-      notExported: "ยังไม่ได้ส่งออก",
-      exportedOn: "ส่งออกแล้ว",
-      exportedMark: "บันทึกว่าส่งออกแล้ว",
-      reminderUnexported: "มี {n} ไฟล์ที่ยังไม่ได้ส่งออก พื้นที่ในเบราว์เซอร์อาจถูก iOS ล้างได้ ควรกด ส่งออก → บันทึกไปยังไฟล์ หลังจบประชุมทุกครั้ง",
-      reminderOld: "มี {n} ไฟล์เก่าเกิน 90 วัน MIA จะไม่ลบเอง เมื่อส่งออกเก็บไว้แล้วให้กด ลบ ด้วยตัวเอง",
-      resume: "อัดต่อ",
-      pause: "พักชั่วคราว",
-      rename: "แก้ชื่อ",
-      renamePrompt: "ชื่อการประชุม",
-      renamed: "แก้ชื่อแล้ว",
-      meetingWord: "ประชุม",
-      titlePlaceholder: "เว้นว่างได้ จะตั้งชื่อตามวันเวลาให้ แก้ทีหลังได้",
-      unpause: "บันทึกต่อ",
-      paused: "พักการบันทึกอยู่ · แตะ บันทึกต่อ",
-      resumePart: "ส่วนที่",
-      stoppedUnexpectedly: "การบันทึกหยุดกลางคัน",
-      resumeHint: "เสียงก่อนหน้าเก็บไว้แล้ว แตะ อัดต่อ เพื่อบันทึกส่วนถัดไปทันที",
-      recoveredHint: "พบการบันทึกที่ค้างจากครั้งก่อนและกู้คืนไว้แล้ว ถ้าประชุมยังไม่จบ แตะ อัดต่อ",
-      wakeLockUnavailable: "อุปกรณ์นี้กันจอดับให้อัตโนมัติไม่ได้ ระหว่างประชุมให้ตั้ง ล็อกอัตโนมัติ เป็น ไม่ใช้ และปิดโหมดประหยัดพลังงาน",
-      deleted: "ลบไฟล์แล้ว",
-      play: "เล่น",
-      export: "ส่งออก",
-      delete: "ลบ",
-      live: "บันทึกสด",
-      incomplete: "เสียงอาจขาดช่วง · ตรวจสอบไฟล์",
-      importedType: "นำเข้า",
-      unknownDate: "ไม่ทราบวันที่",
-      fileLarge: "ไฟล์มีขนาดใหญ่เกินขีดจำกัดของต้นแบบ 1 GiB",
-      noAudio: "ไม่พบข้อมูลเสียงในไฟล์นี้",
-      noExport: "ส่งออกไฟล์ไม่สำเร็จ",
-      permissionTip: "อนุญาตใช้ไมโครโฟนเมื่อ Safari ถาม",
-      backgroundWarning: "ข้อจำกัด iOS: Safari อาจหยุดบันทึกเมื่อสลับแอป ล็อกหน้าจอ หรือมีสายเข้า ให้เปิด MIA ค้างไว้และอย่าล็อกหน้าจอ การบันทึกต่อเนื่องไม่รับประกัน ทดสอบกับ iPhone จริงก่อนใช้กับการประชุมสำคัญ",
-      foregroundNote: "สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้และอย่ากดล็อกหน้าจอ MIA จะพยายามกันจอดับให้ แต่ควรปิดโหมดประหยัดพลังงานและเปิดโหมดห้ามรบกวน ถ้ามีสายเข้าหรือสลับแอป iOS อาจหยุดการบันทึก ให้แตะ อัดต่อ เมื่อกลับมา",
-      installHint: "เพิ่ม MIA ไปยังหน้าจอโฮม: เปิดด้วย Safari → แตะ Share → Add to Home Screen (ต้องใช้ลิงก์ HTTPS)",
-      dbError: "เปิดพื้นที่จัดเก็บในอุปกรณ์ไม่ได้"
-    },
     en: {
-      tagline: "Private meeting audio capture",
-      capture: "Audio capture · iPhone only",
+      tagline: "Ready for your next meeting?",
+      onDevice: "On-device",
+      timerCaption: "hours · minutes · seconds",
       ready: "Ready to record",
       recording: "Recording",
       meetingTitle: "Meeting title",
       start: "Start recording",
-      stop: "Stop and save",
-      onlineTitle: "Online meetings",
-      onlineCopy: "For Teams on a laptop, place the iPhone near the laptop speakers. MIA records acoustic audio and does not connect to Teams.",
-      importTitle: "Import audio",
-      importCopy: "Choose an audio file from iPhone Files. It is stored in MIA locally and is not uploaded.",
-      chooseFile: "Choose audio file",
-      library: "On-device audio files",
-      empty: "No audio files yet",
-      privacy: "MIA prototype · files stay on this iPhone · reminds you after 90 days but never deletes on its own · no Cloud AI or outbound audio transfer",
-      micDenied: "Microphone permission was denied. Allow microphone access in Safari Settings.",
-      micUnsupported: "This browser does not support the required audio recording APIs. Please use current Safari.",
-      recordingStarted: "Recording on this device",
-      saved: "Audio saved on this device",
+      startNew: "Start a new recording",
+      stop: "Stop & save",
+      onlineTitle: "Online meeting?",
+      onlineCopy: "Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.",
+      chooseFile: "Import an audio file",
+      importCopy: "From the Files app. Stored in MIA, never uploaded.",
+      library: "My recordings",
+      empty: "No recordings yet",
+      emptyHint: "Tap Start recording when your meeting begins.",
+      heroIdle: "Tap Start when your meeting begins",
+      heroLive: "I'm listening · keep MIA open",
+      heroPaused: "Paused · tap Continue to go on",
+      heroResume: "Tap Resume to keep going",
+      privacy: "Audio stays on this iPhone. No account, no cloud, no uploads. MIA reminds you about files older than 90 days but never deletes them on its own.",
+      micDenied: "MIA can't use the microphone. Tap Allow when iPhone asks. If you tapped Don't Allow before, go to Settings → Apps → Safari → Microphone, choose Ask or Allow, then try again.",
+      micUnsupported: "This browser can't record audio here. Open MIA in Safari on iPhone (iOS 15 or later).",
+      recordingStarted: "Recording",
+      saved: "Saved on this iPhone",
       imported: "Audio file imported",
-      importFailed: "Audio import failed",
-      storageFailed: "Could not save the audio. Browser storage may be full.",
-      interruption: "MIA was backgrounded or hidden. Audio may contain a gap. Do not lock the screen or switch apps while recording.",
-      trackMuted: "iOS muted the microphone input. MIA stopped and saved a partial recording for review.",
-      trackEnded: "The microphone track ended. MIA stopped recording to avoid saving a silent file.",
-      routeHint: "An audio route change may cause a recording gap.",
-      deleteConfirm: "Delete this audio file from this device?",
-      deleteConfirmUnexported: "This file has never been exported. Once deleted it cannot be recovered. Delete it?",
+      importFailed: "Couldn't import the file",
+      storageFailed: "Couldn't save the audio. Your iPhone storage may be full.",
+      interruption: "MIA left the screen for a moment, so the recording may have a gap. Keep MIA open and don't lock the screen while recording.",
+      trackMuted: "iOS paused the microphone (for example, a call or Siri). MIA stopped and saved what it had recorded.",
+      trackEnded: "The microphone stopped. MIA stopped recording so it doesn't save silence.",
+      routeHint: "Switching audio devices may cause a short gap.",
+      deleteConfirm: "Delete this recording from your iPhone?",
+      deleteConfirmUnexported: "This recording has never been exported. If you delete it, it's gone for good. Delete anyway?",
       notExported: "Not exported",
       exportedOn: "Exported",
       exportedMark: "Marked as exported",
-      reminderUnexported: "{n} file(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
-      reminderOld: "{n} file(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they are exported.",
+      reminderUnexported: "{n} recording(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
+      reminderOld: "{n} recording(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they're exported.",
       resume: "Resume",
       pause: "Pause",
       rename: "Rename",
       renamePrompt: "Meeting title",
       renamed: "Renamed",
       meetingWord: "Meeting",
-      titlePlaceholder: "Optional: named by date and time, rename later",
+      titlePlaceholder: "Optional · auto-named by date",
       unpause: "Continue",
-      paused: "Recording paused · tap Continue",
+      paused: "Paused",
       resumePart: "part",
       stoppedUnexpectedly: "Recording stopped unexpectedly",
-      resumeHint: "The audio so far is saved. Tap Resume to record the next part right away.",
-      recoveredHint: "An unfinished recording from last time was recovered. If the meeting is still going, tap Resume.",
-      wakeLockUnavailable: "This device cannot keep the screen on automatically. During meetings set Auto-Lock to Never and turn off Low Power Mode.",
-      deleted: "Audio deleted",
+      resumeHint: "Everything up to now is saved. Tap Resume to record the next part right away.",
+      recoveredHint: "MIA recovered an unfinished recording from last time. If the meeting is still going, tap Resume.",
+      recoveredSuffix: " (recovered, may be incomplete)",
+      wakeLockUnavailable: "This iPhone can't keep the screen on automatically. Set Auto-Lock to Never and turn off Low Power Mode during meetings.",
+      deleted: "Recording deleted",
       play: "Play",
       export: "Export",
       delete: "Delete",
-      live: "Live recording",
-      incomplete: "Possibly incomplete · review audio",
+      live: "Recorded",
+      incomplete: "May have gaps",
       importedType: "Imported",
       unknownDate: "Unknown date",
-      fileLarge: "File exceeds the prototype's 1 GiB limit",
-      noAudio: "No audio data was found in this file",
-      noExport: "Could not export audio",
-      permissionTip: "Allow microphone access when Safari asks",
-      backgroundWarning: "iOS limitation: Safari may stop or suspend recording when you switch apps, lock the screen, or receive a call. Keep MIA open and the screen unlocked. Continuous recording is not guaranteed; test on the actual iPhone before an important meeting.",
-      foregroundNote: "Important: keep MIA open and do not press the lock button while recording. MIA tries to keep the screen on, but turn off Low Power Mode and turn on Do Not Disturb. A call or app switch can still stop iOS recording; tap Resume when you return.",
-      installHint: "Add MIA to Home Screen: open the HTTPS link in Safari → Share → Add to Home Screen.",
-      dbError: "Could not open local on-device storage"
+      fileLarge: "This file is larger than the 1 GB limit.",
+      noAudio: "No audio was found in this file.",
+      noExport: "Couldn't export the recording",
+      installHint: "Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.",
+      dbError: "Couldn't open storage on this device"
     }
+  };
+
+  // Small inline icons (static markup, no external files).
+  const svg = (body, fill) => '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + (fill ? "currentColor" : "none") +
+    '" stroke="' + (fill ? "none" : "currentColor") + '" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + "</svg>";
+  const ICONS = {
+    mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>'),
+    file: svg('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M10 17v-5l4-1v5"/><circle cx="9" cy="17" r="1.3"/><circle cx="13" cy="16" r="1.3"/>'),
+    play: svg('<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/>', true),
+    share: svg('<path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/>'),
+    pencil: svg('<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16Z"/><path d="m13.5 6.5 4 4"/>'),
+    trash: svg('<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M9 7V4h6v3"/>')
   };
 
   const el = (id) => document.getElementById(id);
   const state = {
-    language: "th",
+    language: "en",
     db: null,
     recorder: null,
     stream: null,
@@ -183,28 +135,49 @@
   }
 
   function setStatus(message, recording = false) {
+    const paused = recording && !!state.pausedAt;
     el("statusText").textContent = message;
-    el("statusDot").classList.toggle("live", recording);
+    el("statusDot").classList.toggle("live", recording && !paused);
+    el("statusDot").classList.toggle("paused", paused);
+    document.body.classList.toggle("is-recording", recording && !paused);
+    document.body.classList.toggle("is-paused", paused);
+    // Idle: one big Start button. Recording: Pause + Stop side by side.
     el("startButton").disabled = recording;
+    el("startButton").classList.toggle("hidden", recording);
     el("stopButton").disabled = !recording;
+    el("stopButton").classList.toggle("hidden", !recording);
     el("importButton").disabled = recording;
-    el("statusDot").classList.toggle("paused", recording && !!state.pausedAt);
+    el("meetingTitle").disabled = recording;
     const pauseButton = el("pauseButton");
-    pauseButton.classList.toggle("hidden", !recording || typeof state.recorder?.pause !== "function");
-    pauseButton.textContent = t(state.pausedAt ? "unpause" : "pause");
+    const canPause = recording && typeof state.recorder?.pause === "function";
+    pauseButton.classList.toggle("hidden", !canPause);
+    el("stopButton").style.gridColumn = canPause || !recording ? "" : "1 / -1";
+    pauseButton.querySelector(".label").textContent = t(paused ? "unpause" : "pause");
+    pauseButton.querySelector(".icon-pause").classList.toggle("hidden", paused);
+    pauseButton.querySelector(".icon-play").classList.toggle("hidden", !paused);
+    el("heroHint").textContent = t(paused ? "heroPaused" : recording ? "heroLive" : state.resume ? "heroResume" : "heroIdle");
     if (recording) hideResume();
+  }
+
+  function resumeLabel(part) {
+    return t("resume") + " · " + t("resumePart") + " " + part;
   }
 
   function offerResume(resume, hintKey) {
     state.resume = resume;
-    el("resumeButton").textContent = t("resume") + " (" + t("resumePart") + " " + resume.part + ")";
+    el("resumeButton").querySelector(".label").textContent = resumeLabel(resume.part);
     el("resumeButton").classList.remove("hidden");
+    el("controls").classList.add("has-resume");
+    el("heroHint").textContent = t("heroResume");
+    el("startButton").querySelector("[data-i18n]").textContent = t("startNew");
     showWarning(t(hintKey));
   }
 
   function hideResume() {
     state.resume = null;
     el("resumeButton").classList.add("hidden");
+    el("controls").classList.remove("has-resume");
+    el("startButton").querySelector("[data-i18n]").textContent = t("start");
   }
 
   function updateTranslations() {
@@ -213,10 +186,9 @@
       const key = node.getAttribute("data-i18n");
       node.textContent = t(key);
     });
-    el("languageButton").textContent = state.language === "th" ? "EN" : "TH";
     el("meetingTitle").placeholder = t("titlePlaceholder");
     if (!state.recorder && !state.resume) setStatus(t("ready"), false);
-    if (state.resume) el("resumeButton").textContent = t("resume") + " (" + t("resumePart") + " " + state.resume.part + ")";
+    if (state.resume) el("resumeButton").querySelector(".label").textContent = resumeLabel(state.resume.part);
     renderRecordings();
   }
 
@@ -297,7 +269,7 @@
         const now = Date.now();
         await saveRecording({
           id: session.id,
-          title: (session.title || "MIA") + (state.language === "th" ? " [กู้คืน · อาจไม่สมบูรณ์]" : " [Recovered · possibly incomplete]"),
+          title: (session.title || "MIA") + t("recoveredSuffix"),
           fileName: session.fileName,
           origin: "live",
           createdAt: session.startedAt,
@@ -335,7 +307,7 @@
 
   function formatDate(value) {
     try {
-      return new Intl.DateTimeFormat(state.language === "th" ? "th-TH" : "en-GB", {
+      return new Intl.DateTimeFormat("en-GB", {
         dateStyle: "medium",
         timeStyle: "short"
       }).format(new Date(value));
@@ -361,21 +333,41 @@
     }
     records.sort((a, b) => b.createdAt - a.createdAt);
     el("recordCount").textContent = String(records.length);
+    el("statTotal").textContent = String(records.length);
+    el("statUnexported").textContent = String(records.filter(record => !record.exportedAt).length);
     renderReminders(records);
     container.replaceChildren();
 
     if (!records.length) {
-      const empty = document.createElement("p");
-      empty.className = "copy";
-      empty.textContent = t("empty");
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      const icon = document.createElement("div");
+      icon.className = "empty-face";
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = '<span class="eye"><i></i></span><span class="eye"><i></i></span>';
+      const title = document.createElement("div");
+      title.className = "empty-title";
+      title.textContent = t("empty");
+      const hint = document.createElement("div");
+      hint.className = "empty-hint";
+      hint.textContent = t("emptyHint");
+      empty.append(icon, title, hint);
       container.append(empty);
       return;
     }
 
-    for (const record of records) {
-      const item = document.createElement("div");
-      item.className = "record";
+    records.forEach((record, position) => {
+      const item = document.createElement("article");
+      item.className = "record tone-" + (position % 4);
       item.dataset.recordId = record.id;
+
+      const head = document.createElement("div");
+      head.className = "record-head";
+      const icon = document.createElement("div");
+      icon.className = "record-icon";
+      icon.innerHTML = record.origin === "imported" ? ICONS.file : ICONS.mic;
+      const main = document.createElement("div");
+      main.className = "record-main";
 
       const name = document.createElement("div");
       name.className = "record-name";
@@ -384,43 +376,48 @@
       const meta = document.createElement("div");
       meta.className = "record-meta";
       meta.textContent = [
-        record.origin === "imported" ? t("importedType") : t("live"),
         formatDate(record.createdAt),
-        formatDuration(record.durationSeconds),
-        record.incomplete ? t("incomplete") : "",
-        humanBytes(record.blob?.size || 0),
-        record.exportedAt ? t("exportedOn") + " " + formatDate(record.exportedAt) : t("notExported")
+        record.durationSeconds ? formatDuration(record.durationSeconds) : "",
+        humanBytes(record.blob?.size || 0)
       ].filter(Boolean).join(" · ");
+      main.append(name, meta);
+      head.append(icon, main);
+
+      const badges = document.createElement("div");
+      badges.className = "badges";
+      const badge = (text, kind) => {
+        const node = document.createElement("span");
+        node.className = "badge" + (kind ? " " + kind : "");
+        node.textContent = text;
+        badges.append(node);
+      };
+      if (record.exportedAt) badge(t("exportedOn") + " " + formatDate(record.exportedAt), "ok");
+      else badge(t("notExported"), "warn");
+      if (record.incomplete) badge(t("incomplete"), "warn");
+      if (record.origin === "imported") badge(t("importedType"));
       if (!record.exportedAt) item.classList.add("unexported");
 
       const actions = document.createElement("div");
       actions.className = "record-actions";
+      const action = (label, iconSvg, className, handler) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "action" + (className ? " " + className : "");
+        button.innerHTML = iconSvg; // static, trusted markup only
+        const text = document.createElement("span");
+        text.textContent = label;
+        button.append(text);
+        button.addEventListener("click", handler);
+        actions.append(button);
+      };
+      action(t("play"), ICONS.play, "", () => playRecord(record.id));
+      action(t("export"), ICONS.share, "export", () => exportRecord(record.id));
+      action(t("rename"), ICONS.pencil, "", () => renameRecord(record.id));
+      action(t("delete"), ICONS.trash, "danger", () => deleteRecord(record.id));
 
-      const play = document.createElement("button");
-      play.type = "button";
-      play.textContent = t("play");
-      play.addEventListener("click", () => playRecord(record.id));
-
-      const exportButton = document.createElement("button");
-      exportButton.type = "button";
-      exportButton.textContent = t("export");
-      exportButton.addEventListener("click", () => exportRecord(record.id));
-
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "delete";
-
-      const rename = document.createElement("button");
-      rename.type = "button";
-      rename.textContent = t("rename");
-      rename.addEventListener("click", () => renameRecord(record.id));
-      remove.textContent = t("delete");
-      remove.addEventListener("click", () => deleteRecord(record.id));
-
-      actions.append(play, exportButton, rename, remove);
-      item.append(name, meta, actions);
+      item.append(head, badges, actions);
       container.append(item);
-    }
+    });
   }
 
   function humanBytes(value) {
@@ -600,7 +597,7 @@
           return;
         }
 
-        const title = sessionRows?.title || (state.language === "th" ? "การประชุม" : "Meeting");
+        const title = sessionRows?.title || t("meetingWord");
         const fileName = sessionRows?.fileName || ("MIA-" + new Date(endedAt).toISOString().replace(/[:.]/g, "-") + "." + fileExtension(blob.type));
         const record = {
           id: recordingId,
@@ -860,10 +857,6 @@
   }
 
   function bindEvents() {
-    el("languageButton").addEventListener("click", () => {
-      state.language = state.language === "th" ? "en" : "th";
-      updateTranslations();
-    });
     el("startButton").addEventListener("click", () => startRecording());
     el("resumeButton").addEventListener("click", () => startRecording(state.resume));
     el("stopButton").addEventListener("click", stopRecording);
