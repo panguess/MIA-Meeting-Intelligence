@@ -2,19 +2,25 @@
   "id": "./",
   "name": "MIA — Meeting Intelligence Assistant",
   "short_name": "MIA",
-  "description": "Private on-device meeting audio capture",
+  "description": "Private meeting recorder. Audio stays on your iPhone.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b1420",
-  "theme_color": "#101c2c",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
   "orientation": "portrait",
   "icons": [
     {
       "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

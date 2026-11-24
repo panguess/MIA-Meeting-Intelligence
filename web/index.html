@@ -1,90 +1,224 @@
 <!doctype html>
-<html lang="th">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#101c2c">
-  <meta name="description" content="MIA — private, on-device meeting audio capture">
+  <meta name="theme-color" content="#0b0f17">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="MIA — private meeting recorder. Audio stays on your iPhone.">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="MIA">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-180.png">
   <title>MIA — Meeting Intelligence Assistant</title>
   <style>
-    :root{color-scheme:dark;--bg:#0b1420;--panel:#142235;--panel2:#192b40;--line:#2b4058;--text:#f1f5f9;--muted:#9eb0c4;--accent:#78c3b2;--danger:#e66c72;--warn:#e6b86c}
-    *{box-sizing:border-box} body{margin:0;background:radial-gradient(ellipse at top,#182b40 0%,var(--bg) 55%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
-    main{width:min(100%,620px);margin:0 auto;padding:22px 0 48px}
-    header{display:flex;align-items:center;justify-content:space-between;margin:8px 2px 22px}
-    .brand{display:flex;gap:12px;align-items:center}.mark{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#9ed6c9,#397e7b);display:grid;place-items:center;color:#07151d;font-weight:900;font-size:19px;letter-spacing:-1px}
-    h1{font-size:21px;line-height:1.15;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:5px}
-    button,input{font:inherit}.lang,button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:12px;padding:11px 14px}
-    .lang{padding:9px 12px;color:var(--accent);font-weight:700}
-    .card{background:linear-gradient(160deg,rgba(26,43,64,.97),rgba(17,31,48,.97));border:1px solid var(--line);border-radius:20px;padding:18px;margin:13px 0;box-shadow:0 12px 34px #0002}
-    .eyebrow{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700}
-    .status-row{display:flex;align-items:center;gap:10px;margin:12px 0}.dot{width:9px;height:9px;border-radius:50%;background:#7890a8}.dot.live{background:var(--danger);box-shadow:0 0 0 5px #e66c7220;animation:pulse 1.5s infinite}@keyframes pulse{50%{box-shadow:0 0 0 9px #e66c7200}}
-    .status{font-size:18px;font-weight:700}.timer{font-variant-numeric:tabular-nums;color:var(--accent);font-size:34px;font-weight:700;letter-spacing:.04em;margin:16px 0}
-    label{display:block;color:var(--muted);font-size:12px;margin:12px 0 6px}.field{width:100%;border:1px solid var(--line);background:#0e1a29;color:var(--text);border-radius:11px;padding:12px 13px}
-    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}.controls button{font-weight:700;min-height:48px}
-    .start{background:var(--danger);border-color:var(--danger);color:#fff}.stop{border-color:#9e4c53;color:#ffb3b7;background:#42272f}
-    button:disabled{opacity:.38}
-    .notice{border:1px solid #8d7041;background:#46371e66;color:#f2d69e;border-radius:12px;padding:12px;font-size:13px;line-height:1.5;margin-top:12px;display:none}
-    .notice.show{display:block}.copy{color:var(--muted);font-size:13px;line-height:1.55}.limitation{border-left:3px solid var(--warn);padding-left:11px;color:#f2d69e}
-    .row{display:flex;align-items:center;justify-content:space-between;gap:12px}.row h2{font-size:15px;margin:0}.small{font-size:11px;color:var(--muted)}
-    .records{display:flex;flex-direction:column;gap:9px;margin-top:13px}.record{border:1px solid var(--line);border-radius:13px;padding:12px;background:#0f1b2a}.record-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}.record-meta{font-size:11px;color:var(--muted);margin-top:5px}.record-actions{display:flex;gap:8px;margin-top:10px}.record-actions button{padding:8px 10px;font-size:12px}.delete{color:#ff9ca2;border-color:#75434a}.record.unexported{border-color:#8d7041}
-    .pause{grid-column:1/-1;border-color:var(--warn);color:var(--warn);background:#46371e66}.dot.paused{background:var(--warn);box-shadow:none;animation:none}
-    .resume{grid-column:1/-1;background:var(--accent);border-color:var(--accent);color:#07151d;min-height:56px;font-size:17px}
-    .privacy{font-size:11px;color:var(--muted);line-height:1.6;text-align:center;padding:14px 8px}.hidden{display:none!important}
-    #fileInput{display:none}.secondary{background:transparent}.primary-text{color:var(--accent)}
-    audio{width:100%;height:34px;margin-top:10px}
-    @media(min-width:520px){main{padding-top:32px}.card{padding:22px}}
+    /* System fonts only (San Francisco on iPhone). No web fonts, no CDNs. */
+    :root{
+      color-scheme:dark;
+      --bg:#0b0f17;--surface:#141a24;--surface-2:#1b2330;--surface-3:#232d3d;
+      --line:rgba(255,255,255,.07);--line-strong:rgba(255,255,255,.13);
+      --text:#f4f6fa;--muted:#8d98a9;--faint:#5f6a7b;
+      --accent:#4fd1b5;--accent-ink:#04211b;--accent-soft:rgba(79,209,181,.13);
+      --record:#ff453a;--record-soft:rgba(255,69,58,.14);
+      --amber:#ffb340;--amber-soft:rgba(255,179,64,.12);
+      --radius:22px;
+      --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      --font-rounded:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html{background:var(--bg)}
+    body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;
+      padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px)}
+    body::before{content:"";position:fixed;inset:0 0 auto;height:420px;pointer-events:none;z-index:-1;
+      background:radial-gradient(120% 70% at 50% 0%,rgba(79,209,181,.10),transparent 70%);transition:background .6s}
+    body.is-recording::before{background:radial-gradient(120% 70% at 50% 0%,rgba(255,69,58,.16),transparent 70%)}
+    body.is-paused::before{background:radial-gradient(120% 70% at 50% 0%,rgba(255,179,64,.12),transparent 70%)}
+    main{width:min(100%,560px);margin:0 auto;padding:8px 0 24px}
+    .hidden{display:none!important}
+    svg{display:block;flex:none}
+    button,input{font:inherit;color:inherit}
+    button{cursor:pointer;touch-action:manipulation}
+    button:disabled{opacity:.4;cursor:default}
+    button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+    /* Header */
+    .top{display:flex;align-items:center;gap:12px;margin:10px 4px 18px}
+    .app-icon{width:44px;height:44px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+    .top h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
+    .top p{margin:1px 0 0;font-size:13px;color:var(--muted)}
+    .pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600;white-space:nowrap}
+
+    /* Cards */
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:0 0 14px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .section-head h2{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+    .count{min-width:26px;padding:3px 9px;border-radius:999px;background:var(--surface-3);color:var(--muted);font-size:13px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+
+    /* Recorder */
+    .recorder{padding:22px 20px 20px;text-align:center}
+    .status-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 12px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:14px;font-weight:600;max-width:100%}
+    #statusText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+    .dot.live{background:var(--record);box-shadow:0 0 0 0 rgba(255,69,58,.6);animation:pulse 1.6s infinite}
+    .dot.paused{background:var(--amber);box-shadow:none;animation:none}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,69,58,.55)}70%{box-shadow:0 0 0 9px rgba(255,69,58,0)}100%{box-shadow:0 0 0 0 rgba(255,69,58,0)}}
+    .timer{font-family:var(--font-rounded);font-size:clamp(52px,17vw,68px);font-weight:300;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;margin:26px 0 6px;color:var(--text);transition:color .3s}
+    body.is-recording .timer{color:#fff}
+    body.is-paused .timer{color:var(--amber)}
+    .timer-caption{font-size:13px;color:var(--muted);margin-bottom:22px}
+    .field-label{display:block;text-align:left;font-size:13px;font-weight:600;color:var(--muted);margin:0 2px 7px}
+    .field{width:100%;border:1px solid var(--line-strong);background:var(--surface-2);border-radius:14px;padding:14px 15px;font-size:16px;outline:none;transition:border-color .2s}
+    .field::placeholder{color:var(--faint)}
+    .field:focus{border-color:var(--accent)}
+    .field:disabled{opacity:.6}
+
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:56px;border-radius:16px;border:0;font-size:17px;font-weight:600;padding:0 12px;white-space:nowrap;transition:transform .12s,opacity .2s,background .2s}
+    .btn:active:not(:disabled){transform:scale(.97)}
+    .btn-record{grid-column:1/-1;background:var(--record);color:#fff;box-shadow:0 10px 28px rgba(255,69,58,.32)}
+    .rec-dot{width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.28)}
+    .btn-stop{background:var(--record);color:#fff}
+    .btn-stop .stop-square{width:13px;height:13px;border-radius:3px;background:#fff}
+    .btn-pause{background:var(--surface-3);color:var(--text)}
+    .btn-resume{grid-column:1/-1;background:var(--accent);color:var(--accent-ink);box-shadow:0 10px 28px rgba(79,209,181,.25)}
+    .controls.has-resume .btn-record{background:var(--surface-3);box-shadow:none;min-height:50px;font-size:16px}
+
+    /* Notices */
+    .notice{display:none;text-align:left;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;margin-top:14px;background:var(--amber-soft);color:#ffd79a;border:1px solid rgba(255,179,64,.22)}
+    .notice.show{display:block}
+    #reminder{margin:0 0 12px}
+
+    /* iPhone limits */
+    .limits h2{font-size:17px;margin:0}
+    .limits .lead{margin:4px 0 14px;color:var(--muted);font-size:14px}
+    .tip-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+    .tip-list li{display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:1.4}
+    .tip-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--surface-3);color:var(--text)}
+    .tip-icon.amber{background:var(--amber-soft);color:var(--amber)}
+    .tip-icon.teal{background:var(--accent-soft);color:var(--accent)}
+    .tip-list strong{display:block;font-weight:600}
+    .tip-list span{color:var(--muted);font-size:14px}
+
+    /* Recordings */
+    .records{display:flex;flex-direction:column;gap:10px}
+    .empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 10px 12px;color:var(--muted);text-align:center;font-size:15px}
+    .empty-icon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--surface-2);color:var(--faint)}
+    .record{background:var(--surface-2);border:1px solid var(--line);border-radius:18px;padding:14px}
+    .record-head{display:flex;gap:12px;align-items:flex-start}
+    .record-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--record-soft);color:var(--record)}
+    .record-icon.imported{background:var(--accent-soft);color:var(--accent)}
+    .record-main{min-width:0;flex:1}
+    .record-name{font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+    .record-meta{font-size:13px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+    .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surface-3);color:var(--muted)}
+    .badge.warn{background:var(--amber-soft);color:var(--amber)}
+    .badge.ok{background:var(--accent-soft);color:var(--accent)}
+    .record-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+    .action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:54px;border:0;border-radius:12px;background:var(--surface-3);font-size:12px;font-weight:600;color:var(--text);padding:6px 2px}
+    .action:active{transform:scale(.96)}
+    .action.export{background:var(--accent-soft);color:var(--accent)}
+    .action.danger{color:#ff7b72}
+    .record audio{width:100%;height:40px;margin-top:12px}
+
+    /* Rows (import, online) */
+    .row-button{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:transparent;border:0;padding:0}
+    .row-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--accent-soft);color:var(--accent)}
+    .row-icon.blue{background:rgba(100,160,255,.13);color:#7fb0ff}
+    .row-text{flex:1;min-width:0}
+    .row-text strong{display:block;font-size:16px;font-weight:600}
+    .row-text span{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+    .chevron{color:var(--faint)}
+    .divider{height:1px;background:var(--line);margin:16px 0 16px 53px}
+    #fileInput{display:none}
+
+    .foot{text-align:center;color:var(--faint);font-size:12px;line-height:1.6;padding:10px 12px 0}
+    .foot p{margin:0 0 8px}
+
+    @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+    @media (min-width:600px){main{padding-top:28px}}
   </style>
 </head>
 <body>
 <main>
-  <header>
-    <div class="brand">
-      <div class="mark">MIA</div>
-      <div><h1>Meeting Intelligence Assistant</h1><div class="sub" data-i18n="tagline">บันทึกการประชุมอย่างเป็นส่วนตัว</div></div>
+  <header class="top">
+    <img class="app-icon" src="./icon.svg" alt="" width="44" height="44">
+    <div>
+      <h1>MIA</h1>
+      <p data-i18n="tagline">Private meeting recorder</p>
     </div>
-    <button class="lang" id="languageButton" type="button">EN</button>
+    <span class="pill" aria-label="Audio stays on this device">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span data-i18n="onDevice">On-device</span>
+    </span>
   </header>
 
-  <section class="card">
-    <div class="eyebrow" data-i18n="capture">Audio capture · iPhone only</div>
-    <div class="status-row"><span class="dot" id="statusDot"></span><div class="status" id="statusText" data-i18n="ready">พร้อมบันทึก</div></div>
-    <p class="copy limitation" data-i18n="foregroundNote">สำคัญ: ระหว่างบันทึกให้เปิด MIA ค้างไว้ใน Safari และอย่าล็อกหน้าจอ iOS อาจหยุดหรือพักการบันทึกเมื่อสลับแอปหรือมีสายเข้า จึงไม่รับประกันว่าจะบันทึกครบทั้งการประชุม</p>
-    <div class="timer" id="timer">00:00:00</div>
-    <label for="meetingTitle" data-i18n="meetingTitle">ชื่อการประชุม</label>
-    <input class="field" id="meetingTitle" maxlength="120" placeholder="เว้นว่างได้ จะตั้งชื่อตามวันเวลาให้ แก้ทีหลังได้">
-    <div class="controls">
-      <button class="start" id="startButton" type="button" data-i18n="start">เริ่มบันทึก</button>
-      <button class="stop" id="stopButton" type="button" disabled data-i18n="stop">หยุดและบันทึก</button>
-      <button class="pause hidden" id="pauseButton" type="button">พักชั่วคราว</button>
-      <button class="resume hidden" id="resumeButton" type="button">อัดต่อ</button>
+  <section class="card recorder" aria-label="Recorder">
+    <div class="status-pill" role="status" aria-live="polite"><span class="dot" id="statusDot"></span><span id="statusText">Ready to record</span></div>
+    <div class="timer" id="timer" aria-label="Recorded time">00:00:00</div>
+    <div class="timer-caption" data-i18n="timerCaption">hours · minutes · seconds</div>
+
+    <label class="field-label" for="meetingTitle" data-i18n="meetingTitle">Meeting title</label>
+    <input class="field" id="meetingTitle" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Optional · auto-named by date">
+
+    <div class="controls" id="controls">
+      <button class="btn btn-resume hidden" id="resumeButton" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <span class="label">Resume</span>
+      </button>
+      <button class="btn btn-record" id="startButton" type="button"><span class="rec-dot" aria-hidden="true"></span><span data-i18n="start">Start recording</span></button>
+      <button class="btn btn-pause hidden" id="pauseButton" type="button">
+        <svg class="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>
+        <svg class="icon-play hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/></svg>
+        <span class="label">Pause</span>
+      </button>
+      <button class="btn btn-stop hidden" id="stopButton" type="button" disabled><span class="stop-square" aria-hidden="true"></span><span data-i18n="stop">Stop &amp; save</span></button>
     </div>
-    <div class="notice" id="warning" role="status"></div>
+    <div class="notice" id="warning" role="alert"></div>
   </section>
 
-  <section class="card">
-    <div class="row"><h2 data-i18n="onlineTitle">การประชุมออนไลน์</h2><span class="small">TEAMS · ACOUSTIC</span></div>
-    <p class="copy" data-i18n="onlineCopy">เปิด Teams บน Laptop แล้ววาง iPhone ใกล้ลำโพงเพื่อบันทึกเสียงจากห้องประชุม MIA ไม่ได้เชื่อมต่อกับ Teams โดยตรง</p>
+  <section class="card limits" aria-labelledby="limitsTitle">
+    <h2 id="limitsTitle">iPhone recording limits</h2>
+    <p class="lead">Safari can't guarantee a complete recording. Test with a short recording before an important meeting.</p>
+    <ul class="tip-list">
+      <li><span class="tip-icon amber"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></span>
+        <div><strong>Keep MIA open on screen</strong><span>Don't press the lock button or switch apps while recording. MIA tries to keep the screen awake.</span></div></li>
+      <li><span class="tip-icon amber"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg></span>
+        <div><strong>Turn on Do Not Disturb</strong><span>Also turn off Low Power Mode. If the screen still dims, set Auto-Lock to Never.</span></div></li>
+      <li><span class="tip-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v4h4"/></svg></span>
+        <div><strong>A call can stop recording</strong><span>The audio so far is saved. When you come back, tap Resume to record the next part.</span></div></li>
+      <li><span class="tip-icon teal"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v4a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-4"/></svg></span>
+        <div><strong>Export after every meeting</strong><span>iOS can clear browser storage. Tap Export, then Save to Files.</span></div></li>
+    </ul>
   </section>
 
-  <section class="card">
-    <div class="row"><h2 data-i18n="importTitle">นำเข้าไฟล์เสียง</h2><span class="small">ON DEVICE</span></div>
-    <p class="copy" data-i18n="importCopy">เลือกไฟล์เสียงจาก iPhone Files เพื่อเก็บไว้ใน MIA โดยไม่มีการอัปโหลดออกจากอุปกรณ์</p>
-    <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
-    <button class="secondary" id="importButton" type="button" data-i18n="chooseFile">เลือกไฟล์เสียง</button>
-  </section>
-
-  <section class="card">
-    <div class="row"><h2 data-i18n="library">ไฟล์เสียงในอุปกรณ์</h2><span class="small" id="recordCount">0</span></div>
+  <section class="card" aria-labelledby="libraryTitle">
+    <div class="section-head"><h2 id="libraryTitle" data-i18n="library">Recordings</h2><span class="count" id="recordCount">0</span></div>
     <div class="notice" id="reminder" role="status"></div>
-    <div class="records" id="records"><p class="copy" data-i18n="empty">ยังไม่มีไฟล์เสียง</p></div>
+    <div class="records" id="records"></div>
   </section>
 
-  <div class="privacy" data-i18n="installHint">เพิ่ม MIA ไปยังหน้าจอโฮม: เปิดด้วย Safari → แตะ Share → Add to Home Screen (ต้องใช้ลิงก์ HTTPS)</div>
-  <div class="privacy" data-i18n="privacy">MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เตือนเมื่อไฟล์เก่าเกิน 90 วันแต่ไม่ลบเอง · ไม่มี Cloud AI หรือการส่งข้อมูลออก</div>
+  <section class="card">
+    <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
+    <button class="row-button" id="importButton" type="button">
+      <span class="row-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="m9.5 13.5 2.5 2.5 2.5-2.5"/></svg></span>
+      <span class="row-text"><strong data-i18n="chooseFile">Import an audio file</strong><span data-i18n="importCopy">From the Files app. Stored in MIA, never uploaded.</span></span>
+      <svg class="chevron" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1.5 1.5 6 6-6 6"/></svg>
+    </button>
+    <div class="divider"></div>
+    <div class="row-button">
+      <span class="row-icon blue"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16.5V20"/></svg></span>
+      <span class="row-text"><strong data-i18n="onlineTitle">Online meeting?</strong><span data-i18n="onlineCopy">Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.</span></span>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p data-i18n="privacy">Audio stays on this iPhone. No account, no cloud, no uploads. MIA reminds you about files older than 90 days but never deletes them on its own.</p>
+    <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
+    <p>MIA prototype</p>
+  </footer>
 </main>
 <script src="./app.js" defer></script>
 </body>
