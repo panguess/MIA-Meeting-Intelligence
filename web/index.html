@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101c2c">
+  <meta name="description" content="MIA — private, on-device meeting audio capture">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <title>MIA — Meeting Intelligence Assistant</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1420;--panel:#142235;--panel2:#192b40;--line:#2b4058;--text:#f1f5f9;--muted:#9eb0c4;--accent:#78c3b2;--danger:#e66c72;--warn:#e6b86c}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(ellipse at top,#182b40 0%,var(--bg) 55%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+    main{width:min(100%,620px);margin:0 auto;padding:22px 0 48px}
+    header{display:flex;align-items:center;justify-content:space-between;margin:8px 2px 22px}
+    .brand{display:flex;gap:12px;align-items:center}.mark{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#9ed6c9,#397e7b);display:grid;place-items:center;color:#07151d;font-weight:900;font-size:19px;letter-spacing:-1px}
+    h1{font-size:21px;line-height:1.15;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:5px}
+    button,input{font:inherit}.lang,button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:12px;padding:11px 14px}
+    .lang{padding:9px 12px;color:var(--accent);font-weight:700}
+    .card{background:linear-gradient(160deg,rgba(26,43,64,.97),rgba(17,31,48,.97));border:1px solid var(--line);border-radius:20px;padding:18px;margin:13px 0;box-shadow:0 12px 34px #0002}
+    .eyebrow{color:var(--muted);text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700}
+    .status-row{display:flex;align-items:center;gap:10px;margin:12px 0}.dot{width:9px;height:9px;border-radius:50%;background:#7890a8}.dot.live{background:var(--danger);box-shadow:0 0 0 5px #e66c7220;animation:pulse 1.5s infinite}@keyframes pulse{50%{box-shadow:0 0 0 9px #e66c7200}}
+    .status{font-size:18px;font-weight:700}.timer{font-variant-numeric:tabular-nums;color:var(--accent);font-size:34px;font-weight:700;letter-spacing:.04em;margin:16px 0}
+    label{display:block;color:var(--muted);font-size:12px;margin:12px 0 6px}.field{width:100%;border:1px solid var(--line);background:#0e1a29;color:var(--text);border-radius:11px;padding:12px 13px}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}.controls button{font-weight:700;min-height:48px}
+    .start{background:var(--danger);border-color:var(--danger);color:#fff}.stop{border-color:#9e4c53;color:#ffb3b7;background:#42272f}
+    button:disabled{opacity:.38}
+    .notice{border:1px solid #8d7041;background:#46371e66;color:#f2d69e;border-radius:12px;padding:12px;font-size:13px;line-height:1.5;margin-top:12px;display:none}
+    .notice.show{display:block}.copy{color:var(--muted);font-size:13px;line-height:1.55}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px}.row h2{font-size:15px;margin:0}.small{font-size:11px;color:var(--muted)}
+    .records{display:flex;flex-direction:column;gap:9px;margin-top:13px}.record{border:1px solid var(--line);border-radius:13px;padding:12px;background:#0f1b2a}.record-name{font-size:13px;font-weight:700;overflow-wrap:anywhere}.record-meta{font-size:11px;color:var(--muted);margin-top:5px}.record-actions{display:flex;gap:8px;margin-top:10px}.record-actions button{padding:8px 10px;font-size:12px}.delete{color:#ff9ca2;border-color:#75434a}
+    .privacy{font-size:11px;color:var(--muted);line-height:1.6;text-align:center;padding:14px 8px}.hidden{display:none!important}
+    #fileInput{display:none}.secondary{background:transparent}.primary-text{color:var(--accent)}
+    audio{width:100%;height:34px;margin-top:10px}
+    @media(min-width:520px){main{padding-top:32px}.card{padding:22px}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">
+      <div class="mark">MIA</div>
+      <div><h1>Meeting Intelligence Assistant</h1><div class="sub" data-i18n="tagline">บันทึกการประชุมอย่างเป็นส่วนตัว</div></div>
+    </div>
+    <button class="lang" id="languageButton" type="button">EN</button>
+  </header>
+
+  <section class="card">
+    <div class="eyebrow" data-i18n="capture">Audio capture · iPhone only</div>
+    <div class="status-row"><span class="dot" id="statusDot"></span><div class="status" id="statusText" data-i18n="ready">พร้อมบันทึก</div></div>
+    <div class="timer" id="timer">00:00:00</div>
+    <label for="meetingTitle" data-i18n="meetingTitle">ชื่อการประชุม</label>
+    <input class="field" id="meetingTitle" maxlength="120" placeholder="เช่น Weekly Risk Review">
+    <div class="controls">
+      <button class="start" id="startButton" type="button" data-i18n="start">เริ่มบันทึก</button>
+      <button class="stop" id="stopButton" type="button" disabled data-i18n="stop">หยุดและบันทึก</button>
+    </div>
+    <div class="notice" id="warning" role="status"></div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2 data-i18n="onlineTitle">การประชุมออนไลน์</h2><span class="small">TEAMS · ACOUSTIC</span></div>
+    <p class="copy" data-i18n="onlineCopy">เปิด Teams บน Laptop แล้ววาง iPhone ใกล้ลำโพงเพื่อบันทึกเสียงจากห้องประชุม MIA ไม่ได้เชื่อมต่อกับ Teams โดยตรง</p>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2 data-i18n="importTitle">นำเข้าไฟล์เสียง</h2><span class="small">ON DEVICE</span></div>
+    <p class="copy" data-i18n="importCopy">เลือกไฟล์เสียงจาก iPhone Files เพื่อเก็บไว้ใน MIA โดยไม่มีการอัปโหลดออกจากอุปกรณ์</p>
+    <input id="fileInput" type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.caf,.mp4">
+    <button class="secondary" id="importButton" type="button" data-i18n="chooseFile">เลือกไฟล์เสียง</button>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2 data-i18n="library">ไฟล์เสียงในอุปกรณ์</h2><span class="small" id="recordCount">0</span></div>
+    <div class="records" id="records"><p class="copy" data-i18n="empty">ยังไม่มีไฟล์เสียง</p></div>
+  </section>
+
+  <div class="privacy" data-i18n="privacy">MIA รุ่นทดลอง · ไฟล์เก็บไว้บน iPhone เท่านั้น · เป้าหมายเก็บเสียง 90 วัน · ไม่มี Cloud AI หรือการส่งข้อมูลออก</div>
+</main>
+<script src="./app.js" defer></script>
+</body>
+</html>
