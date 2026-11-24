@@ -34,6 +34,8 @@
       importFailed: "นำเข้าไฟล์ไม่สำเร็จ",
       storageFailed: "บันทึกไฟล์ไม่สำเร็จ พื้นที่เบราว์เซอร์อาจไม่เพียงพอ",
       interruption: "ตรวจพบว่าแอปออกจากหน้าจอ อาจมีเสียงขาดหาย กรุณาอย่าล็อกหน้าจอหรือสลับแอประหว่างบันทึก",
+      trackMuted: "ไมโครโฟนถูกพักโดยระบบ iOS จึงหยุดบันทึกและเก็บไฟล์บางส่วนไว้ให้ตรวจสอบ",
+      trackEnded: "ไมโครโฟนหยุดทำงาน ระบบจึงหยุดบันทึกเพื่อป้องกันไฟล์ที่ไม่มีเสียง",
       routeHint: "หากเปลี่ยนอุปกรณ์เสียง อาจมีช่วงเสียงขาดหาย",
       deleteConfirm: "ลบไฟล์เสียงนี้ออกจากอุปกรณ์หรือไม่?",
       deleted: "ลบไฟล์แล้ว",
@@ -76,6 +78,8 @@
       importFailed: "Audio import failed",
       storageFailed: "Could not save the audio. Browser storage may be full.",
       interruption: "MIA was backgrounded or hidden. Audio may contain a gap. Do not lock the screen or switch apps while recording.",
+      trackMuted: "iOS muted the microphone input. MIA stopped and saved a partial recording for review.",
+      trackEnded: "The microphone track ended. MIA stopped recording to avoid saving a silent file.",
       routeHint: "An audio route change may cause a recording gap.",
       deleteConfirm: "Delete this audio file from this device?",
       deleted: "Audio deleted",
@@ -383,6 +387,20 @@
       });
 
       state.stream = stream;
+      const microphoneTrack = stream.getAudioTracks()[0];
+      if (microphoneTrack) {
+        microphoneTrack.addEventListener("mute", () => {
+          state.pendingWarning = true;
+          showWarning(t("trackMuted"));
+          // Stop instead of silently saving a long section of silence.
+          if (state.recorder && state.recorder.state === "recording") state.recorder.stop();
+        });
+        microphoneTrack.addEventListener("ended", () => {
+          state.pendingWarning = true;
+          showWarning(t("trackEnded"));
+          if (state.recorder && state.recorder.state === "recording") state.recorder.stop();
+        });
+      }
       state.chunks = [];
       state.chunkSequence = 0;
       state.chunkWriteQueue = Promise.resolve();
