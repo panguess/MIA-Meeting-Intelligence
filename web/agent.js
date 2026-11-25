@@ -659,12 +659,29 @@
   // Returns { count, part(i) -> { blob, offset } }. Decodes at 16 kHz and cuts
   // 5-minute parts. If this iPhone can't decode the file, a file under 24 MB is
   // sent whole instead.
+  // Decode to 16 kHz. Some iPhones refuse a 16 kHz AudioContext for their own
+  // recordings, so fall back to the normal rate and resample offline.
+  async function decode16k(blob) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const buf = await blob.arrayBuffer();
+    try {
+      const ctx = new Ctx({ sampleRate: 16000 });
+      try { return await ctx.decodeAudioData(buf.slice(0)); } finally { ctx.close && ctx.close(); }
+    } catch (e1) {
+      const ctx = new Ctx();
+      let full;
+      try { full = await new Promise((ok, bad) => { const r = ctx.decodeAudioData(buf.slice(0), ok, bad); if (r && r.catch) r.catch(bad); }); }
+      finally { ctx.close && ctx.close(); }
+      const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      const off = new Off(1, Math.max(1, Math.ceil(full.duration * 16000)), 16000);
+      const src = off.createBufferSource(); src.buffer = full; src.connect(off.destination); src.start();
+      diag("Audio decoded at " + full.sampleRate + " Hz and resampled (16 kHz decode failed: " + (e1 && (e1.name || e1.message)) + ")");
+      return await off.startRendering();
+    }
+  }
   async function splitAudio(blob) {
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx({ sampleRate: 16000 });
-      const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
-      ctx.close && ctx.close();
+      const audio = await decode16k(blob);
       const rate = audio.sampleRate, size = PART_SECONDS * rate;
       const chans = [...Array(audio.numberOfChannels)].map((_, c) => audio.getChannelData(c));
       return {
@@ -680,7 +697,8 @@
           return { blob: wav(mono, rate), offset: i * PART_SECONDS, samples: mono, rate };
         }
       };
-    } catch {
+    } catch (e) {
+      diag("Couldn't decode audio (" + (e && (e.name || e.message)) + "), " + (blob.type || "?") + ", " + blob.size + " bytes; sending it whole");
       if (blob.size > DIRECT_UPLOAD_MAX) throw new Error("This iPhone couldn't open this audio file. Try exporting it as m4a, or split it into shorter files.");
       return { duration: 0, count: 1, part: () => ({ blob, offset: 0, name: "audio" }) };
     }
@@ -690,9 +708,11 @@
   const TYPHOON = "https://api.opentyphoon.ai/v1";
   const TYPHOON_KEY = "mia-typhoon-key";
   const getTyphoonKey = () => { try { return localStorage.getItem(TYPHOON_KEY) || ""; } catch { return ""; } };
+  // File name with the right extension, so the service knows the format.
+  const fileName = blob => "part." + (/wav/.test(blob.type) ? "wav" : /webm/.test(blob.type) ? "webm" : /ogg/.test(blob.type) ? "ogg" : /mpeg|mp3/.test(blob.type) ? "mp3" : "m4a");
   async function typhoonFile(blob, attempt = 0) {
     const form = new FormData();
-    form.append("file", blob, "part.wav");
+    form.append("file", blob, fileName(blob));
     const tyModel = useModel("typhoon");
     form.append("model", tyModel);
     const ctl = new AbortController();
@@ -715,7 +735,7 @@
   }
   // One-minute pieces keep each upload small and give rough time anchors.
   async function typhoonPart(p) {
-    if (!p.samples) throw new Error("Typhoon needs decoded audio");
+    if (!p.samples) { const text = await typhoonFile(p.blob); return text ? "[" + stamp(p.offset) + "] " + text : ""; }
     const step = 60 * p.rate, out = [];
     for (let s = 0, k = 0; s < p.samples.length; s += step, k++) {
       const text = await typhoonFile(wav(p.samples.subarray(s, Math.min(p.samples.length, s + step)), p.rate));
@@ -731,7 +751,7 @@
   const getOpenAIKey = () => { try { return localStorage.getItem(OPENAI_KEY) || ""; } catch { return ""; } };
   async function openaiFile(blob, attempt = 0) {
     const form = new FormData();
-    form.append("file", blob, "part.wav");
+    form.append("file", blob, fileName(blob));
     const model = useModel("openai");
     form.append("model", model);
     form.append("language", "th");
@@ -757,7 +777,8 @@
   }
   // 30-second pieces, 4 at a time: fine time stamps and fast on long meetings.
   async function openaiPart(p) {
-    if (!p.samples) throw new Error("needs decoded audio");
+    // Not decodable on this iPhone: OpenAI reads the original m4a itself.
+    if (!p.samples) { const text = await openaiFile(p.blob); return text ? "[" + stamp(p.offset) + "] " + text : ""; }
     const step = 30 * p.rate, jobs = [];
     for (let s = 0, k = 0; s < p.samples.length; s += step, k++) jobs.push({ k, s });
     const out = new Array(jobs.length);
