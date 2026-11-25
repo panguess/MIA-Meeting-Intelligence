@@ -1572,6 +1572,27 @@
       $("oaKey").value = ""; oaState(); $("oaEdit").classList.add("hidden"); $("oaToggle").setAttribute("aria-expanded", "false"); refreshModels(true); renderModels();
       toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
     });
+    // Checks, from this browser, whether OpenAI answers: first the key, then
+    // a 1-second silent clip (costs well under 1 satang).
+    $("oaTest").addEventListener("click", async () => {
+      const note = $("oaTestNote");
+      if (!getOpenAIKey()) { note.textContent = "Save a key first."; return; }
+      note.textContent = "Testing…";
+      const step = async (what, fn) => {
+        try { const r = await fn(); return r; }
+        catch (e) { throw new Error(what + ": " + (e && (e.name === "TypeError" ? "blocked or no connection (" + e.message + ")" : e.message))); }
+      };
+      try {
+        const r = await step("Key check", () => fetch(OPENAI + "/models", { headers: { Authorization: "Bearer " + getOpenAIKey() } }));
+        if (r.status === 401) throw new Error("Key check: OpenAI didn't accept the key");
+        if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error("Key check: HTTP " + r.status + " " + ((d.error && d.error.message) || "")); }
+        await step("Listening test", () => openaiFile(wav(new Float32Array(16000), 16000)));
+        note.textContent = "✓ OpenAI answered from this iPhone. Key and listening both work.";
+      } catch (e) {
+        note.textContent = "✗ " + e.message;
+      }
+      diag("OpenAI test: " + note.textContent);
+    });
     const tyState = () => {
       $("tyState").textContent = getTyphoonKey() ? "✓ Connected" : "Not connected";
       $("tyToggle").textContent = getTyphoonKey() ? "Change key" : "Connect";
