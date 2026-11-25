@@ -1058,6 +1058,11 @@
   async function getRecord(id) {
     return dbRequest("readonly", store => store.get(id));
   }
+  // The Agent tab asks for a recording's audio when its own copy wasn't saved.
+  window.MIARecordAudio = async id => {
+    const r = id && await getRecord(id).catch(() => null);
+    return r && r.blob ? freshBlob(r) : null;
+  };
 
   // iOS Safari often can't play or share a Blob straight out of IndexedDB
   // ("WebKitBlobResource error"). A fresh in-memory copy works.
