@@ -245,6 +245,16 @@
       return tx("readwrite", s => s.put({ ...rest, audioNotSaved: true }));
     }
   }
+  // iOS can refuse to keep the audio inside the job (see saveJob). The same
+  // recording is still in the Record tab, so fetch it from there when needed.
+  async function ensureAudio(job) {
+    if (job.audio instanceof Blob && job.audio.size) return job.audio;
+    const blob = job.recordId && window.MIARecordAudio ? await window.MIARecordAudio(job.recordId) : null;
+    if (!blob || !blob.size) throw new Error("The audio for this meeting isn't on this iPhone any more. Open it in the Record tab and tap Minutes again.");
+    job.audio = blob;
+    return blob;
+  }
+  const hasAudio = job => !!(job.audio || job.recordId);
   const deleteJob = id => tx("readwrite", s => s.delete(id));
   const loadJobs = () => tx("readonly", s => s.getAll());
 
@@ -559,8 +569,8 @@
         for (const x of $("jobKind").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.kind === kind));
         $("kindNote").textContent = (job.kind && job.kind !== "auto" ? "Set by you" : "Auto-detected") + (job.engine ? " · Heard by " + earsName(job.engine) : "");
         $("mStats").classList.toggle("hidden", kind !== "meeting");
-        $("improveBtn").classList.toggle("hidden", job.source !== "live" || !job.audio);
-        $("improveNote").classList.toggle("hidden", job.source !== "live" || !job.audio);
+        $("improveBtn").classList.toggle("hidden", job.source !== "live" || !hasAudio(job));
+        $("improveNote").classList.toggle("hidden", job.source !== "live" || !hasAudio(job));
         const out = job.outLang || (job.lang === "en" ? "en" : "th");
         for (const x of $("jobOut").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x.dataset.out === out));
       }
@@ -955,8 +965,8 @@
 
   // Same audio, heard again by OpenAI (paid): side by side with the free ears.
   async function compareEars(job) {
-    if (!job.audio) return toast("This job has no audio to re-listen to.");
-    if (!getOpenAIKey()) return toast("Add an OpenAI key first: ⚙ Settings → Advanced.");
+    try { await ensureAudio(job); } catch (e) { return toast(e.message); }
+    if (!getOpenAIKey()) return toast("Add an OpenAI key first: ⚙ Settings → Speech engines → OpenAI.");
     const min = Math.max(1, Math.round((job.duration || 0) / 60));
     if (!window.confirm("OpenAI will listen to this recording again. Cost: " + (min < 6 ? "less than 1 THB" : "about " + Math.round(min / 6) + " THB") + " (" + min + " min of audio, paid to OpenAI). Continue?")) return;
     const d = $("compareDialog");
@@ -1234,7 +1244,7 @@
         showResult(job);
         return;
       }
-      const split = await splitAudio(job.audio);
+      const split = await splitAudio(await ensureAudio(job));
       if (split.duration && !job.duration) job.duration = split.duration;
       const n = split.count;
       job.parts = (job.parts || []).slice(0, n);
@@ -1571,7 +1581,7 @@
     $("detailBack").addEventListener("click", () => { state.openId = null; render(); });
     $("improveBtn").addEventListener("click", async () => {
       const job = state.jobs.find(j => j.id === state.openId);
-      if (!job || job.status === "working" || !job.audio) return;
+      if (!job || job.status === "working" || !hasAudio(job)) return;
       job.liveTranscript = job.liveTranscript || job.transcript;
       job.source = "audio"; job.status = "queued"; job.progress = 0; job.transcript = ""; job.transcriptComplete = false; job.parts = []; job.minutes = "";
       state.tab = "transcript";
