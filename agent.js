@@ -1316,7 +1316,7 @@
     li.querySelector(".st-val").textContent = text;
   }
   function renderStatus() {
-    setStatusRow("stGroq", !!getKey(), getKey() ? "✓ Connected" : "Set up →", true);
+    setStatusRow("stGroq", !!getKey(), getKey() ? "✓ Connected" : "Not set up", true);
     setStatusRow("stTy", !!getTyphoonKey(), getTyphoonKey() ? "✓ Connected" : "Not connected", false);
   }
   function openSetup() {
@@ -1527,7 +1527,7 @@
       render();
       if (TRANSCRIBER.ready && job.transcriptComplete) processJob(job);
     });
-    const oaState = () => { $("oaState").textContent = getOpenAIKey() ? "On" : "Off"; $("oaBrain").checked = brainOn(); $("oaBrainRow").classList.toggle("hidden", !getOpenAIKey()); };
+    const oaState = () => { $("oaState").textContent = getOpenAIKey() ? "On" : "Off"; $("oaBrain").checked = brainOn(); $("oaBrainRow").classList.toggle("hidden", !getOpenAIKey()); $("stOa").classList.toggle("ok", !!getOpenAIKey()); $("oaToggle").textContent = getOpenAIKey() ? "Change key" : "Add key"; };
     $("oaBrain").addEventListener("change", e => {
       try { e.target.checked ? localStorage.setItem(BRAIN_KEY, "1") : localStorage.removeItem(BRAIN_KEY); } catch {}
       if (e.target.checked) refreshModels(true);
@@ -1538,7 +1538,7 @@
     $("oaSave").addEventListener("click", () => {
       const v = $("oaKey").value.trim();
       try { if (v) localStorage.setItem(OPENAI_KEY, v); else localStorage.removeItem(OPENAI_KEY); } catch {}
-      $("oaKey").value = ""; oaState(); refreshModels(true); renderModels();
+      $("oaKey").value = ""; oaState(); $("oaEdit").classList.add("hidden"); $("oaToggle").setAttribute("aria-expanded", "false"); refreshModels(true); renderModels();
       toast(v ? "OpenAI on. New recordings use it (paid, about 10 THB per hour)." : "OpenAI off. Free engines only.");
     });
     const tyState = () => {
@@ -1546,7 +1546,7 @@
       $("tyToggle").textContent = getTyphoonKey() ? "Change key" : "Connect";
     };
     // Each "Change key" / "Set up" opens the edit box inside its own row.
-    for (const [btn, box] of [["tyToggle", "tyEdit"], ["gdToggle", "gdEdit"]]) {
+    for (const [btn, box] of [["tyToggle", "tyEdit"], ["gdToggle", "gdEdit"], ["oaToggle", "oaEdit"]]) {
       $(btn).addEventListener("click", () => {
         const open = $(box).classList.toggle("hidden") === false;
         $(btn).setAttribute("aria-expanded", String(open));
