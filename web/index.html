@@ -445,6 +445,13 @@
     .improve{display:block;margin:4px auto 12px}
     .seek{border:0;background:var(--cream);border-radius:8px;padding:0 6px;margin-left:4px;font:inherit;font-size:12px;font-weight:800;color:var(--muted);text-decoration:underline}
     .line.seek-hit{background:var(--lilac);border-radius:10px;transition:background .3s}
+    .quiet{position:fixed;inset:0;z-index:50;background:#000;color:rgba(255,255,255,.3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+    .quiet.hidden{display:none}
+    .q-clock{font-family:var(--display);font-size:64px;letter-spacing:1px}
+    .q-time{font-size:15px;font-weight:700;color:rgba(255,255,255,.18);font-variant-numeric:tabular-nums}
+    .q-hint{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom));font-size:12px;font-weight:700;color:rgba(255,255,255,.14)}
+    body.quiet-on{overflow:hidden}
+    #dimButton{display:block;margin:2px auto 0;color:#fff}
   </style>
 </head>
 <body>
@@ -452,7 +459,7 @@
  <div class="view-record">
   <header class="top">
     <div class="avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.17.4</p></div>
+    <div class="top-text"><h1>Record</h1><p class="ver">MIA v0.18.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
   </header>
 
@@ -476,6 +483,7 @@
       <button class="btn btn-stop hidden" id="stopButton" type="button" disabled><span class="stop-square" aria-hidden="true"></span><span data-i18n="stop">Stop &amp; save</span></button>
       <button class="btn btn-mark hidden" id="markButton" type="button"><span aria-hidden="true">★</span> <span class="label">Mark this moment</span></button>
     </div>
+    <button class="link-btn hidden" id="dimButton" type="button">Quiet screen</button>
     <div class="notice" id="warning" role="alert"></div>
   </section>
 
@@ -526,7 +534,7 @@
   <div id="agentHome">
    <header class="top">
     <div class="avatar agent-avatar" aria-hidden="true"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>
-    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.17.4</p></div>
+    <div class="top-text"><h1>Agent</h1><p class="ver">MIA v0.18.0</p></div>
     <button class="gear" type="button" data-settings aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></button>
    </header>
 
@@ -664,6 +672,16 @@
    </ul>
    <p class="set-note">Green means ready. Nothing else is needed.</p>
 
+   <h3 class="set-h">Screen</h3>
+   <div class="set-card">
+    <div class="set-row"><span class="set-label"><strong>Quiet screen</strong><small>Plain dark screen while recording. Tap it to see MIA.</small></span>
+     <div class="pill-toggle" id="quietToggle" role="group" aria-label="Quiet screen">
+      <button type="button" data-quiet="0" aria-pressed="true">Off</button>
+      <button type="button" data-quiet="1" aria-pressed="false">On</button>
+     </div>
+    </div>
+   </div>
+
    <h3 class="set-h">Report</h3>
    <div class="set-card">
     <div class="set-row"><span class="set-label"><strong>Language</strong><small>Recordings can be Thai, English or both</small></span>
@@ -740,7 +758,7 @@
   <div class="foot">
     <p data-i18n="privacy">Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.</p>
     <p data-i18n="installHint">Tip: in Safari, tap Share → Add to Home Screen to open MIA like an app.</p>
-    <p>MIA prototype · v0.17.4</p>
+    <p>MIA prototype · v0.18.0</p>
   </div>
    </div>
   </dialog>
@@ -774,5 +792,6 @@
 <script src="./app.js" defer></script>
 <script src="./agent.js" defer></script>
 <script src="./backup.js" defer></script>
+<script src="./quiet.js" defer></script>
 </body>
 </html>
