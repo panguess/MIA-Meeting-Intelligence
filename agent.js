@@ -1468,6 +1468,63 @@
     return "<h1>" + esc(job.name) + "</h1><p>" + esc(meta) + "</p>" + renderMinutes(job.minutes) +
       "<p style=\"color:#777;font-size:9pt\">Prepared with MIA. Check items marked verify.</p>";
   }
+  // Copy minutes with formatting: rich HTML (Word, Mail, Notes, Gmail) plus
+  // tidy plain text (LINE, WhatsApp, plain editors). Styles are inline because
+  // most editors drop <style> blocks on paste.
+  function richMinutesHtml(job) {
+    const S = {
+      h1: "font-size:18pt;font-weight:bold;margin:0 0 4pt", h2: "font-size:14pt;font-weight:bold;margin:14pt 0 4pt;color:#8a2a1c",
+      h3: "font-size:13pt;font-weight:bold;margin:12pt 0 4pt;color:#8a2a1c", p: "margin:0 0 6pt", ul: "margin:0 0 6pt;padding-left:20pt", li: "margin:0 0 2pt",
+      table: "border-collapse:collapse;margin:4pt 0 8pt", th: "border:1px solid #999;padding:4pt 6pt;background:#f3e6dc;text-align:left;font-weight:bold", td: "border:1px solid #999;padding:4pt 6pt;vertical-align:top"
+    };
+    let h = exportHtml(job)
+      .replace(/<button class="seek"[^>]*>([^<]*)<\/button>/g, "($1)")
+      .replace(/<span class="verify">verify<\/span>/g, '<span style="color:#b00000">[verify]</span>')
+      .replace(/<div class="table-box">|<\/div>/g, "");
+    for (const tag of Object.keys(S)) h = h.replace(new RegExp("<" + tag + "(\\s[^>]*)?>", "g"), "<" + tag + ' style="' + S[tag] + '">');
+    return '<div style="font-family:Calibri,\'Leelawadee UI\',Tahoma,sans-serif;font-size:11pt;color:#222">' + h + "</div>";
+  }
+  function plainMinutes(job) {
+    const meta = [fmtDate(job.createdAt), fmtDur(job.duration)].filter(Boolean).join(" · ");
+    const lines = [job.name, meta, ""];
+    let rows = [];
+    const cells = r => r.replace(/^\s*\||\|\s*$/g, "").split("|").map(c => c.trim());
+    const flushTable = () => {
+      if (!rows.length) return;
+      const body = rows.filter(r => !/^\s*\|?\s*:?-{2,}/.test(r)).map(cells);
+      const head = body.shift() || [];
+      const numbered = /^(#|no\.?|ลำดับ|ที่)$/i.test(head[0] || "");
+      body.forEach((r, i) => {
+        const from = numbered ? 1 : 0;
+        const rest = r.slice(from).map((c, k) => (head[k + from] && (k + from) ? head[k + from] + ": " : "") + c).filter(x => x.trim()).join(" · ");
+        lines.push((numbered ? r[0] || i + 1 : i + 1) + ". " + rest);
+      });
+      lines.push(""); rows = [];
+    };
+    for (const raw of String(job.minutes || "").split("\n")) {
+      if (/^\s*\|/.test(raw)) { rows.push(raw); continue; }
+      flushTable();
+      let l = raw.replace(/\*\*(.+?)\*\*/g, "$1").replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, "$1$2").replace(/\[verify\]/gi, "[verify]");
+      const m = l.match(/^(#{1,6})\s+(.*)/);
+      if (m) { if (lines[lines.length - 1] !== "") lines.push(""); lines.push(m[1].length <= 2 ? "■ " + m[2] : m[2]); continue; }
+      const b = l.match(/^(\s*)[-*+]\s+(.*)/);
+      if (b) { lines.push((b[1].length >= 2 ? "    ◦ " : "• ") + b[2]); continue; }
+      if (/^\s*-{3,}\s*$/.test(l)) { lines.push(""); continue; }
+      lines.push(l);
+    }
+    flushTable();
+    return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function copyMinutes(job) {
+    const text = plainMinutes(job);
+    try {
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        const item = new ClipboardItem({ "text/html": new Blob([richMinutesHtml(job)], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) });
+        return navigator.clipboard.write([item]).then(() => toast("Minutes copied with formatting"), () => copyText(text, "Minutes copied"));
+      }
+    } catch {}
+    return copyText(text, "Minutes copied");
+  }
   const safeName = n => (String(n || "Minutes").replace(/[\\/:*?"<>|]+/g, " ").trim() || "Minutes").slice(0, 80);
   async function exportWord(job) {
     const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>' + esc(job.name) +
@@ -1495,10 +1552,10 @@
     if (!job) return;
     if (name === "copySummary") return copyText(summaryText(job), "Copied. Open Claude and paste.");
     if (name === "openClaude") return window.open("https://claude.ai/new", "_blank", "noopener");
-    if (name === "copyMinutes") return copyText(job.minutes, "Minutes copied");
+    if (name === "copyMinutes") return copyMinutes(job);
     if (name === "shareMinutes") {
-      if (navigator.share) { try { await navigator.share({ title: job.name, text: job.minutes }); } catch {} }
-      else copyText(job.minutes, "Minutes copied");
+      if (navigator.share) { try { await navigator.share({ title: job.name, text: plainMinutes(job) }); } catch {} }
+      else copyMinutes(job);
     }
   }
 
