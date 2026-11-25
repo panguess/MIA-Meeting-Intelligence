@@ -23,8 +23,8 @@
       stop: "Stop & save",
       onlineTitle: "Online meeting?",
       onlineCopy: "Place your iPhone near the laptop speaker. MIA records the room sound; it doesn't connect to Teams.",
-      chooseFile: "Import an audio file",
-      importCopy: "From the Files app. Stored in MIA, never uploaded.",
+      chooseFile: "Import a recording",
+      importCopy: "Recorded in Voice Memos or another app? Share → Save to Files, then pick it here. MIA makes the minutes.",
       library: "My recordings",
       empty: "No recordings yet",
       emptyHint: "Tap Start recording when your meeting begins.",
@@ -32,7 +32,7 @@
       heroLive: "I'm listening · keep MIA open",
       heroPaused: "Paused · tap Continue to go on",
       heroResume: "Tap Resume to keep going",
-      privacy: "Audio stays on this iPhone. No account, and MIA never uploads anything. A copy you save to OneDrive for a transcript follows your OneDrive settings. MIA never deletes recordings on its own.",
+      privacy: "Recordings are saved on this iPhone. If you connect Groq in the Agent tab, the audio is sent to Groq to make the transcript and minutes. MIA never deletes recordings on its own.",
       micDenied: "MIA can't use the microphone. Tap Allow when iPhone asks. If you tapped Don't Allow before, go to Settings → Apps → Safari → Microphone, choose Ask or Allow, then try again.",
       micUnsupported: "This browser can't record audio here. Open MIA in Safari on iPhone (iOS 15 or later).",
       recordingStarted: "Recording",
@@ -49,7 +49,7 @@
       notExported: "Not exported",
       exportedOn: "Exported",
       exportedMark: "Marked as exported",
-      reminderUnexported: "{n} recording(s) not exported yet. iOS can clear browser storage, so tap Export → Save to Files after every meeting.",
+      reminderUnexported: "{n} recording(s) without a backup. iOS can clear browser storage; for important meetings tap Export → Save to Files.",
       reminderOld: "{n} recording(s) are older than 90 days. MIA never deletes them on its own; delete them yourself once they're exported.",
       resume: "Resume",
       pause: "Pause",
@@ -57,11 +57,14 @@
       renamePrompt: "Meeting title",
       renamed: "Renamed",
       meetingWord: "Meeting",
-      titlePlaceholder: "Optional · auto-named by date",
+      titlePlaceholder: "Meeting title (optional)",
       unpause: "Continue",
       paused: "Paused",
       resumePart: "part",
       stoppedUnexpectedly: "Recording stopped unexpectedly",
+      autoResuming: "Resuming the recording…",
+      autoResumed: "Recording resumed by itself after a {gap} gap. The part before the gap is saved and being summarised.",
+      autoResumeFailed: "MIA couldn't restart the microphone by itself. Tap Resume to keep recording.",
       resumeHint: "Everything up to now is saved. Tap Resume to record the next part right away.",
       recoveredHint: "MIA recovered an unfinished recording from last time. If the meeting is still going, tap Resume.",
       recoveredSuffix: " (recovered, may be incomplete)",
@@ -71,7 +74,7 @@
       export: "Export",
       delete: "Delete",
       live: "Recorded",
-      incomplete: "May have gaps",
+      incomplete: "MIA left the screen · check audio",
       importedType: "Imported",
       unknownDate: "Unknown date",
       fileLarge: "This file is larger than the 1 GB limit.",
@@ -137,6 +140,7 @@
     pausedTotal: 0,
     wakeLock: null,
     resume: null,
+    auto: null,
     transcriptTarget: null,
     transcriptOpen: null
   };
@@ -171,6 +175,7 @@
     el("startButton").classList.toggle("hidden", recording);
     el("stopButton").disabled = !recording;
     el("stopButton").classList.toggle("hidden", !recording);
+    el("markButton").classList.toggle("hidden", !recording);
     el("importButton").disabled = recording;
     el("meetingTitle").disabled = recording;
     const pauseButton = el("pauseButton");
@@ -302,16 +307,20 @@
           mimeType: blob.type,
           blob,
           size: blob.size,
-          incomplete: true
+          incomplete: true,
+          live: liveTake(session.id)
         });
+        session.endedAt = session.startedAt + rows.length * 1000;
         if (!latest || session.startedAt > latest.startedAt) latest = session;
       }
       await deleteSessionData(session.id);
     }
     // Only offer to continue if the interrupted recording started recently.
     if (latest && Date.now() - latest.startedAt < 6 * 60 * 60 * 1000) {
-      offerResume(nextPart(latest), "recoveredHint");
+      offerResume({ ...nextPart(latest), series: latest.series || latest.id, since: latest.endedAt || latest.startedAt }, "recoveredHint");
       setStatus(t("stoppedUnexpectedly"), false);
+      const endedAt = latest.endedAt || latest.startedAt;
+      if (Date.now() - endedAt < AUTO_RESUME_MS) scheduleAutoResume(state.resume, endedAt);
     }
   }
 
@@ -436,9 +445,9 @@
         button.addEventListener("click", handler);
         actions.append(button);
       };
+      action("Minutes", ICONS.text, "primary", () => sendToAgent(record.id));
       action(t("play"), ICONS.play, "", () => playRecord(record.id));
-      action(t("export"), ICONS.share, "export", () => exportRecord(record.id));
-      action(t("transcriptShort"), ICONS.text, record.transcript ? "has-transcript" : "", () => openTranscript(record.id));
+      action(t("export"), ICONS.share, "", () => exportRecord(record.id));
       action(t("rename"), ICONS.pencil, "", () => renameRecord(record.id));
       action(t("delete"), ICONS.trash, "danger", () => deleteRecord(record.id));
 
@@ -491,6 +500,9 @@
       state.wakeLock = lock;
       lock.addEventListener("release", () => {
         if (state.wakeLock === lock) state.wakeLock = null;
+        setTimeout(() => {
+          if (!state.wakeLock && state.recorder && state.recorder.state !== "inactive" && document.visibilityState === "visible") acquireWakeLock();
+        }, 1000);
       });
     } catch {
       showWarning(t("wakeLockUnavailable"));
@@ -503,7 +515,8 @@
     if (lock) lock.release().catch(() => {});
   }
 
-  async function startRecording(resume = null) {
+  async function startRecording(resume = null, gapNote = "") {
+    if (!gapNote) state.auto = null;
     clearWarning();
     const continuing = resume && typeof resume.part === "number" ? resume : null;
     hideResume();
@@ -520,11 +533,15 @@
     }
 
     try {
+      audioMode("play-and-record");
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
+          // No echo cancelling or noise removal: they can clip quiet speech.
+          // Auto gain on: lifts a speaker who is far from the iPhone.
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
+          autoGainControl: true,
+          channelCount: 1
         }
       });
 
@@ -551,6 +568,10 @@
       state.pausedAt = null;
       state.pausedTotal = 0;
       state.recordingId = crypto.randomUUID();
+      state.marks = [];
+      updateMarkLabel();
+      liveStart(state.recordingId);
+      if (gapNote) { live.lines.push({ at: 0, text: gapNote }); liveSave(); liveRender(); }
 
       const baseTitle = (continuing ? continuing.baseTitle : (el("meetingTitle").value || "").trim())
         || t("meetingWord") + " " + formatDate(state.startedAt);
@@ -567,11 +588,15 @@
         part,
         fileName,
         startedAt: state.startedAt,
-        mimeType
+        mimeType,
+        // Parts of one session (split by a call or lock) share a series id, so
+        // the Agent writes ONE report for the whole session.
+        series: continuing && continuing.series || null,
+        gapSec: continuing && continuing.since ? Math.round((Date.now() - continuing.since) / 1000) : 0
       }), SESSION_STORE);
       state.userStopped = false;
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 128000 });
       state.recorder = recorder;
 
       recorder.addEventListener("dataavailable", event => {
@@ -591,11 +616,17 @@
       });
 
       recorder.addEventListener("stop", async () => {
+        state.saving = true;
+        setTimeout(() => { state.saving = false; }, 15000);
         const endedAt = Date.now();
         const recordingId = state.recordingId;
         const recordedSeconds = elapsedSeconds(endedAt);
         const wasPossiblyInterrupted = state.pendingWarning;
         const stoppedByUser = state.userStopped;
+        const marks = (state.marks || []).slice();
+        const liveText = liveStop();
+        const preCount = await segStop();
+        levelStop();
         await state.chunkWriteQueue;
         const rows = recordingId ? await getChunks(recordingId) : [];
         const blob = new Blob(rows.sort((a, b) => a.index - b.index).map(row => row.blob), {
@@ -620,7 +651,7 @@
           if (recordingId) await deleteSessionData(recordingId);
           setStatus(t("ready"), false);
           showWarning(t("noAudio"));
-          if (!stoppedByUser && sessionRows) offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1 }, "resumeHint");
+          if (!stoppedByUser && sessionRows) { offerResume({ baseTitle: sessionRows.baseTitle ?? "", part: sessionRows.part || 1, series: sessionRows.series || null, since: endedAt }, "resumeHint"); scheduleAutoResume(state.resume, endedAt); }
           return;
         }
 
@@ -636,19 +667,35 @@
           mimeType: blob.type || "application/octet-stream",
           blob,
           size: blob.size,
-          incomplete: wasPossiblyInterrupted
+          incomplete: wasPossiblyInterrupted,
+          marks,
+          live: liveText
         };
 
         try {
           await saveRecording(record);
           await deleteSessionData(recordingId);
+          // Hand the recording to the Agent so the transcript and minutes start by
+          // themselves. If iOS stopped it (call, lock), the user can still Resume;
+          // the Agent then gets this first part only when they tap Minutes.
+          const handOff = (stay = false) => {
+            if (!window.MIAAgent || !window.MIAAgent.addAudio) { showWarning("Agent isn't loaded. Close MIA and open it again, then tap Minutes."); return; }
+            Promise.resolve(window.MIAAgent.addAudio(blob, title, { recordId: recordingId, duration: recordedSeconds, marks, stay, live: liveText, series: sessionRows && sessionRows.series, gapSec: sessionRows && sessionRows.gapSec, pre: preCount ? recordingId : null, preCount }))
+              .catch(error => showWarning("The recording is saved, but the report didn't start (" + (error?.message || error?.name || "storage error") + "). Open Agent and tap the recording to try again."));
+          };
           if (!stoppedByUser) {
             setStatus(t("stoppedUnexpectedly"), false);
-            offerResume(nextPart(sessionRows || { baseTitle: "", part: 1 }), "resumeHint");
+            offerResume({ ...nextPart(sessionRows || { baseTitle: "", part: 1 }), series: (sessionRows && sessionRows.series) || recordingId, since: endedAt }, "resumeHint");
+            scheduleAutoResume(state.resume, endedAt);
+            // iOS stopped it (call, lock, app switch). Still send this part to the
+            // Agent in the background so nothing waits on the user; the Record tab
+            // stays open so they can Resume. A resumed part becomes its own job.
+            handOff(true);
           } else {
             setStatus(t("saved"), false);
             if (!wasPossiblyInterrupted) clearWarning();
             else showWarning(t("interruption"));
+            handOff();
           }
         } catch (error) {
           setStatus(t("ready"), false);
@@ -657,6 +704,9 @@
       });
 
       recorder.start(1000);
+      segStart(stream, mimeType, state.recordingId);
+      levelStart(stream);
+      liveRender();
       setStatus(t("recordingStarted"), true);
       startTimer();
       await acquireWakeLock();
@@ -673,9 +723,234 @@
     }
   }
 
+  // ---------- Live text (like phone dictation) ----------
+  // Safari's speech recognition turns speech into text while recording, so the
+  // minutes can be written right after Stop without uploading the audio. iOS
+  // ends each recognition session after a short while or a pause, so it is
+  // restarted for as long as the recording runs. The audio is still recorded
+  // as a backup ("Improve accuracy" re-listens to it).
+  // Apple's live speech-to-text is OFF: on iPhone it takes over the microphone,
+  // so the real recording became silent. The good engines now transcribe the
+  // audio in the background every 2 minutes instead (see "Segments" below).
+  const Speech = null;
+  const live = { rec: null, on: false, lines: [], interim: "", failed: "", lastEvent: 0, dog: null, id: null, all: new Set() };
+  // Live lines are also kept in localStorage while recording, so a crash or an
+  // iOS reload keeps the text of the recovered part.
+  const liveKey = id => "mia-live-" + id;
+  const fmtStamp = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const liveAsText = lines => lines.map(l => "[" + fmtStamp(l.at) + "] " + l.text).join("\n");
+  function liveSave() { if (live.id) { try { localStorage.setItem(liveKey(live.id), JSON.stringify(live.lines)); } catch {} } }
+  function liveTake(id) {
+    try { const raw = localStorage.getItem(liveKey(id)); localStorage.removeItem(liveKey(id)); return raw ? liveAsText(JSON.parse(raw)) : ""; } catch { return ""; }
+  }
+  // ---------- Segments: transcribe while recording ----------
+  // A second recorder on the same microphone closes a small file every
+  // minute and hands it to the Agent, which transcribes it right away with
+  // Whisper + Typhoon. At Stop only the last piece is left, so the report comes
+  // quickly and from the accurate engines. The main recording is untouched.
+  const SEG_SECONDS = (() => { try { return Number(localStorage.getItem("mia-seg-seconds")) || 60; } catch { return 60; } })();
+  const seg = { rec: null, idx: 0, delivered: 0, startAt: 0, timer: null, rid: null, mime: "", off: false, done: null, text: "" };
+  function segOne() {
+    const r = new MediaRecorder(state.stream, { mimeType: seg.mime, audioBitsPerSecond: 64000 });
+    const parts = [], idx = seg.idx++, offset = seg.startAt, rid = seg.rid;
+    r.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+    r.onstop = () => {
+      const blob = new Blob(parts, { type: r.mimeType || seg.mime });
+      if (blob.size && window.MIAAgent && window.MIAAgent.preSegment) window.MIAAgent.preSegment(rid, idx, blob, offset);
+      else seg.idx = -1;   // a missing piece: the Agent re-listens to the whole recording instead
+      seg.delivered++;
+      if (seg.done && seg.delivered >= seg.idx) seg.done();
+    };
+    r.start(1000);
+    seg.rec = r;
+  }
+  function segStart(stream, mime, rid) {
+    clearInterval(seg.timer);
+    Object.assign(seg, { rec: null, idx: 0, delivered: 0, startAt: 0, rid, mime, off: false, done: null, text: "" });
+    if (!window.MIAAgent || !window.MIAAgent.preReady || !window.MIAAgent.preReady()) { seg.off = true; return; }
+    try { segOne(); } catch { seg.off = true; return; }
+    seg.timer = setInterval(() => {
+      if (!state.recorder || state.recorder.state !== "recording" || !seg.rec) return;
+      const now = elapsedSeconds();
+      // First piece after 45 s so text shows up early; then every minute.
+      if (now - seg.startAt < (seg.idx === 1 ? Math.min(45, SEG_SECONDS) : SEG_SECONDS)) return;
+      const old = seg.rec;
+      seg.startAt = now;
+      try { segOne(); } catch { seg.off = true; }
+      try { old.stop(); } catch {}
+    }, 2000);
+  }
+  function segStop() {
+    clearInterval(seg.timer);
+    if (seg.off || !seg.rec) return Promise.resolve(0);
+    return new Promise(resolve => {
+      const finish = () => { seg.done = null; resolve(seg.idx > 0 ? seg.idx : 0); };
+      seg.done = finish;
+      try { seg.rec.state !== "inactive" ? seg.rec.stop() : finish(); } catch { finish(); }
+      seg.rec = null;
+      setTimeout(finish, 4000);
+    });
+  }
+  // The Agent calls this as each piece is transcribed.
+  window.MIAPreview = (rid, text) => {
+    if (rid !== seg.rid) return;
+    seg.text = text || "";
+    liveRender();
+  };
+
+  // ---------- Microphone level: warn if MIA only hears silence ----------
+  const level = { ctx: null, an: null, timer: null, quietSince: 0, warned: false };
+  function levelStart(stream) {
+    levelStop();
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      level.ctx = new Ctx();
+      level.ctx.resume && level.ctx.resume().catch(() => {});
+      level.an = level.ctx.createAnalyser();
+      level.an.fftSize = 1024;
+      level.ctx.createMediaStreamSource(stream).connect(level.an);
+    } catch { return; }
+    const buf = new Float32Array(level.an.fftSize);
+    level.quietSince = Date.now(); level.warned = false;
+    level.timer = setInterval(() => {
+      if (!level.an || !state.recorder || state.pausedAt) { level.quietSince = Date.now(); return; }
+      if (level.ctx.state !== "running") return;   // can't measure: never warn by mistake
+      level.an.getFloatTimeDomainData(buf);
+      let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+      const bar = el("levelFill");
+      if (bar) bar.style.width = Math.min(100, Math.round(rms * 600)) + "%";
+      if (rms > 0.004) { level.quietSince = Date.now(); if (level.warned) { level.warned = false; clearWarning(); } return; }
+      if (!level.warned && Date.now() - level.quietSince > 12000) {
+        level.warned = true;
+        showWarning("MIA hears only silence. Check that no other app is using the microphone and that nothing covers it.");
+        try { window.MIAAgent && window.MIAAgent.diag && window.MIAAgent.diag("Recording was silent for 12 s"); } catch {}
+      }
+    }, 500);
+  }
+  function levelStop() {
+    clearInterval(level.timer); level.timer = null;
+    try { level.ctx && level.ctx.close(); } catch {}
+    level.ctx = null; level.an = null;
+    const bar = el("levelFill"); if (bar) bar.style.width = "0%";
+  }
+
+  function liveRender() {
+    const box = el("liveBox");
+    if (!box) return;
+    const recording = !!state.recorder;
+    box.classList.toggle("hidden", !recording);
+    const pre = (seg.text || "").split("\n").filter(Boolean).slice(-3).map(l => l.replace(/^\[[\d:]+\]\s*/, "")).join(" ");
+    const last = live.lines.slice(-3).map(l => l.text).join(" ");
+    el("liveText").textContent = (pre || last).trim() || (seg.off ? "Recording… the transcript is made after Stop." : "Recording… the first lines appear after about 1 minute.");
+  }
+  function liveStart(id) {
+    live.lines = []; live.interim = ""; live.failed = ""; live.id = id || null;
+    if (!Speech) return;
+    live.on = true;
+    const run = () => {
+      if (!live.on) return;
+      // Never more than one recogniser: an old one left running would keep
+      // the mic on (and keep writing text) after Stop.
+      liveKill();
+      const r = new Speech();
+      live.all.add(r);
+      r.lang = "th-TH"; r.continuous = true; r.interimResults = true;
+      r.onresult = e => {
+        if (!live.on || r !== live.rec) { liveKillOne(r); return; }
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i], text = (res[0] && res[0].transcript || "").trim();
+          if (!text) continue;
+          // Time = when the sentence STARTED (iOS can take a minute to
+          // finalise a long sentence), not when it was finalised.
+          if (live.segAt == null) live.segAt = Math.max(0, Math.round(elapsedSeconds()) - 2);
+          if (res.isFinal) { live.lines.push({ at: live.segAt, text }); live.segAt = null; liveSave(); }
+          else interim += " " + text;
+        }
+        live.interim = interim.trim();
+        live.lastEvent = Date.now();
+        liveRender();
+      };
+      r.onerror = e => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "audio-capture") {
+          live.on = false; live.failed = "Live text isn't available here. The recording continues.";
+          liveRender();
+        }
+      };
+      r.onend = () => {
+        live.all.delete(r);
+        // A session that ends without a final result: keep what was heard.
+        if (r === live.rec && live.interim) { live.lines.push({ at: live.segAt != null ? live.segAt : Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; liveSave(); }
+        if (r === live.rec) live.segAt = null;
+        if (live.on && r === live.rec) setTimeout(() => { if (live.on && r === live.rec && !state.pausedAt && state.recorder) run(); }, 250);
+      };
+      live.rec = r;
+      live.lastEvent = Date.now();
+      try { r.start(); } catch { setTimeout(() => { if (live.on && r === live.rec && !state.pausedAt && state.recorder) run(); }, 1000); }
+    };
+    live.run = run;
+    run();
+    // Watchdog: if iOS silently stops recognising (no result, no end event)
+    // for 45 s while recording, start a fresh session.
+    clearInterval(live.dog);
+    live.dog = setInterval(() => {
+      if (!live.on || !state.recorder) { clearInterval(live.dog); return; }
+      if (state.pausedAt) return;
+      if (Date.now() - live.lastEvent > 45000) run();
+    }, 15000);
+    liveRender();
+  }
+  function liveKillOne(r) {
+    if (!r) return;
+    r.onresult = r.onend = r.onerror = null;
+    try { r.abort ? r.abort() : r.stop(); } catch {}
+    live.all.delete(r);
+  }
+  function liveKill() {
+    for (const r of [...live.all]) liveKillOne(r);
+    live.rec = null;
+  }
+  function livePause(paused) {
+    if (!live.on && !live.rec) return;
+    if (paused) liveKill();
+    else if (live.on && live.run) { live.lastEvent = Date.now(); live.run(); }
+  }
+  function liveStop() {
+    live.on = false;
+    clearInterval(live.dog);
+    if (live.interim) { live.lines.push({ at: live.segAt != null ? live.segAt : Math.round(elapsedSeconds()), text: live.interim }); live.interim = ""; }
+    live.segAt = null;
+    liveKill();
+    const text = liveAsText(live.lines);
+    if (live.id) { try { localStorage.removeItem(liveKey(live.id)); } catch {} }
+    live.id = null;
+    liveRender();
+    return text;
+  }
+
+  // Bookmarks: the user taps Mark when something important is said. The
+  // Agent highlights those moments in the transcript and the minutes.
+  function updateMarkLabel() {
+    const n = (state.marks || []).length;
+    el("markButton").querySelector(".label").textContent = n ? "Mark this moment · " + n : "Mark this moment";
+  }
+  function markMoment() {
+    if (!state.recorder) return;
+    const sec = Math.round(elapsedSeconds());
+    state.marks = state.marks || [];
+    state.marks.push(sec);
+    updateMarkLabel();
+    const mm = String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0");
+    el("heroHint").textContent = "Marked " + mm + " ★";
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+
   function stopRecording() {
     if (state.recorder && state.recorder.state !== "inactive") {
       state.userStopped = true;
+      // Turn live text off at once (privacy): no more listening after Stop.
+      live.on = false; clearInterval(live.dog); liveKill();
       state.recorder.stop();
     }
   }
@@ -693,12 +968,16 @@
     try {
       if (recorder.state === "recording") {
         recorder.pause();
+        try { seg.rec && seg.rec.state === "recording" && seg.rec.pause(); } catch {}
         state.pausedAt = Date.now();
+        livePause(true);
         setStatus(t("paused"), true);
       } else if (recorder.state === "paused") {
         recorder.resume();
+        try { seg.rec && seg.rec.state === "paused" && seg.rec.resume(); } catch {}
         state.pausedTotal += Date.now() - (state.pausedAt || Date.now());
         state.pausedAt = null;
+        livePause(false);
         setStatus(t("recordingStarted"), true);
       }
       updateTimer();
@@ -729,6 +1008,12 @@
       state.stream.getTracks().forEach(track => track.stop());
       state.stream = null;
     }
+    audioMode("playback");
+  }
+  // iOS 17+: while the mic is in use the iPhone plays sound quietly (call mode).
+  // Switch back to normal media playback whenever the mic is off.
+  function audioMode(type) {
+    try { if (navigator.audioSession) navigator.audioSession.type = type; } catch {}
   }
 
   function fileExtension(mime) {
@@ -763,6 +1048,8 @@
         size: blob.size
       });
       setStatus(t("imported"), false);
+      // Straight to the Agent: transcript and minutes start by themselves.
+      await window.MIAAgent?.addAudio(blob, file.name.replace(/\.[a-z0-9]+$/i, ""), { recordId: id });
     } catch (error) {
       showWarning(t("importFailed") + ": " + (error?.message || ""));
     }
@@ -771,13 +1058,68 @@
   async function getRecord(id) {
     return dbRequest("readonly", store => store.get(id));
   }
+  // The Agent tab asks for a recording's audio when its own copy wasn't saved.
+  window.MIARecordAudio = async id => {
+    const r = id && await getRecord(id).catch(() => null);
+    return r && r.blob ? freshBlob(r) : null;
+  };
+
+  // iOS Safari often can't play or share a Blob straight out of IndexedDB
+  // ("WebKitBlobResource error"). A fresh in-memory copy works.
+  const diagApp = m => { try { window.MIAAgent && window.MIAAgent.diag && window.MIAAgent.diag(m); } catch {} };
+  async function freshBlob(record) {
+    try {
+      const buf = await record.blob.arrayBuffer();
+      return new Blob([buf], { type: record.mimeType || record.blob.type || "audio/mp4" });
+    } catch (e) {
+      diagApp("Couldn't read the saved audio (" + (e && (e.name || e.message)) + "), size " + (record.blob && record.blob.size));
+      return record.blob;
+    }
+  }
+  // Last resort for playback: decode with Web Audio and play a WAV copy.
+  async function wavCopy(blob, boost = false) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx({ sampleRate: 16000 });
+    const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+    ctx.close && ctx.close();
+    const ch = audio.getChannelData(0), n = ch.length;
+    let peak = 0; for (let i = 0; i < n; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; }
+    const gain = peak > 0.001 && peak < 0.5 ? Math.min(10, 0.9 / peak) : 1;
+    if (boost) {
+      diagApp("Playback level: peak " + peak.toFixed(3) + (gain > 1 ? ", made " + gain.toFixed(1) + "x louder" : ", normal"));
+      if (gain === 1) return null;
+      for (let i = 0; i < n; i++) ch[i] *= gain;
+    }
+    const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, audio.sampleRate, true); v.setUint32(28, audio.sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, ch[i])) * 0x7fff, true);
+    return new Blob([buf], { type: "audio/wav" });
+  }
+
+  async function sendToAgent(id) {
+    try {
+      const record = await getRecord(id);
+      if (!record?.blob) throw new Error(t("noAudio"));
+      await window.MIAAgent?.addAudio(await freshBlob(record), record.title, { recordId: record.id, duration: record.durationSeconds, marks: record.marks || [], live: record.live || "" });
+    } catch (error) {
+      showWarning(error?.message || t("noAudio"));
+    }
+  }
 
   async function playRecord(id) {
     try {
       const record = await getRecord(id);
       if (!record?.blob) throw new Error("Audio file not found");
       revokeObjectUrl(id);
-      const url = URL.createObjectURL(record.blob);
+      if (!state.stream) audioMode("playback");
+      const blob = await freshBlob(record);
+      let url = URL.createObjectURL(blob);
+      // Quiet recording: play a louder copy (clips up to 20 min, to spare memory).
+      if ((record.durationSeconds || 0) <= 1200) {
+        try { const loud = await wavCopy(blob, true); if (loud) { URL.revokeObjectURL(url); url = URL.createObjectURL(loud); } } catch {}
+      }
       state.currentObjectUrls.set(id, url);
 
       const recordElement = document.querySelector(`[data-record-id="${CSS.escape(id)}"]`);
@@ -787,9 +1129,25 @@
       audio.controls = true;
       audio.preload = "metadata";
       audio.src = url;
-      audio.addEventListener("error", () => showWarning(t("noAudio")), { once: true });
+      let triedWav = false;
+      const onErr = async () => {
+        const code = audio.error ? audio.error.code : "?";
+        if (triedWav) { diagApp("Playback failed even as WAV (code " + code + ")"); showWarning("This recording can't be played on this iPhone. The transcript and report are not affected."); return; }
+        triedWav = true;
+        diagApp("Playback error code " + code + " for " + (blob.type || "?") + ", " + blob.size + " bytes. Trying a WAV copy.");
+        try {
+          const wavUrl = URL.createObjectURL(await wavCopy(blob));
+          state.currentObjectUrls.set(id, wavUrl);
+          audio.src = wavUrl;
+          await audio.play().catch(() => {});
+        } catch (e) {
+          diagApp("The audio file couldn't be decoded (" + (e && (e.name || e.message)) + ")");
+          showWarning("This recording can't be played on this iPhone. The transcript and report are not affected.");
+        }
+      };
+      audio.addEventListener("error", onErr);
       recordElement.append(audio);
-      await audio.play();
+      await audio.play().catch(e => { if (e && e.name === "NotSupportedError") onErr(); });
     } catch (error) {
       showWarning((error?.message || t("noAudio")));
     }
@@ -800,14 +1158,14 @@
       const record = await getRecord(id);
       if (!record?.blob) throw new Error(t("noExport"));
       if (navigator.share && typeof File === "function") {
-        const shareFile = new File([record.blob], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
+        const shareFile = new File([await freshBlob(record)], record.fileName || "MIA-audio", { type: record.mimeType || record.blob.type });
         if (navigator.canShare?.({ files: [shareFile] })) {
           await navigator.share({ files: [shareFile], title: record.title || "MIA audio" });
           await markExported(id);
           return;
         }
       }
-      const url = URL.createObjectURL(record.blob);
+      const url = URL.createObjectURL(await freshBlob(record));
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = record.fileName || "MIA-audio";
@@ -1034,6 +1392,44 @@
     }
   }
 
+  // ---------- Auto-resume after a call, Siri, lock or app switch ----------
+  // iOS stops the microphone during a call (answered or declined) and when the
+  // page is hidden. The part so far is already saved and handed to the Agent.
+  // As soon as MIA is on screen again, it starts the next part by itself, and
+  // the transcript gets a line saying how long the gap was. Only for 20
+  // minutes after the stop, so an old meeting never starts recording again.
+  const AUTO_RESUME_MS = 20 * 60 * 1000;
+  function gapText(ms) {
+    const m = Math.round(ms / 60000);
+    return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " s" : m + " min";
+  }
+  function scheduleAutoResume(resume, since) {
+    if (!resume) return;
+    state.auto = { resume, since: since || Date.now(), tries: 0 };
+    setTimeout(tryAutoResume, 1500);
+  }
+  async function tryAutoResume() {
+    const a = state.auto;
+    if (!a || a.busy || state.recorder || document.visibilityState !== "visible") return;
+    if (Date.now() - a.since > AUTO_RESUME_MS) { state.auto = null; return; }
+    a.busy = true; a.tries++;
+    setStatus(t("autoResuming"), false);
+    const gap = gapText(Date.now() - a.since);
+    await startRecording(a.resume, "(Recording paused for about " + gap + " because of an interruption, e.g. a phone call. Anything said during the gap is missing.)");
+    a.busy = false;
+    if (state.recorder) {
+      state.auto = null;
+      showWarning(t("autoResumed").replace("{gap}", gap));
+    } else if (a.tries < 3) {
+      offerResume(a.resume, "resumeHint");
+      setTimeout(tryAutoResume, 4000);
+    } else {
+      state.auto = null;
+      offerResume(a.resume, "resumeHint");
+      showWarning(t("autoResumeFailed"));
+    }
+  }
+
   function onVisibilityChange() {
     if (document.visibilityState === "hidden" && state.recorder && state.recorder.state === "recording") {
       state.pendingWarning = true;
@@ -1043,13 +1439,37 @@
       if (state.recorder && state.recorder.state !== "inactive" && !state.wakeLock) acquireWakeLock();
       // Keep the flag until finalization so the saved recording is marked for review.
       if (state.pendingWarning) showWarning(t("interruption"));
+      if (state.auto) setTimeout(tryAutoResume, 800);
     }
   }
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator && location.protocol === "https:") {
-      navigator.serviceWorker.register("./sw.js").catch(() => {
-        // App remains functional online even if offline caching is unavailable.
+      const hadController = !!navigator.serviceWorker.controller;
+      // Shows whether this copy could reach the update server, so the user knows
+      // when a "new version" can't arrive (laptop off or not on the hotspot).
+      const setLink = ok => document.querySelectorAll(".ver").forEach(v => {
+        v.dataset.base = v.dataset.base || v.textContent;
+        v.textContent = v.dataset.base + (ok ? "" : " · offline copy");
+      });
+      const check = reg => reg.update().then(() => setLink(true), () => setLink(false));
+      window.MIACheckUpdate = () => navigator.serviceWorker.getRegistration().then(reg => reg ? check(reg) : setLink(false));
+      navigator.serviceWorker.register("./sw.js")
+        .then(check)
+        .catch(() => {
+          // App remains functional online even if offline caching is unavailable.
+        });
+      // When a new version takes over, reload once so the user sees it now,
+      // not on the next launch. Never reload in the middle of a recording.
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hadController || reloaded) return;
+        // Also wait while a recording is being saved and handed to the Agent,
+        // or while the Agent is working, so an update never drops a job.
+        const busy = () => state.recorder || state.saving || (window.MIAAgent && window.MIAAgent.busy());
+        const reload = () => { if (!reloaded && !busy()) { reloaded = true; location.reload(); } };
+        if (!busy()) reload();
+        else document.addEventListener("visibilitychange", reload);
       });
     }
   }
@@ -1058,6 +1478,7 @@
     el("startButton").addEventListener("click", () => startRecording());
     el("resumeButton").addEventListener("click", () => startRecording(state.resume));
     el("stopButton").addEventListener("click", stopRecording);
+    el("markButton").addEventListener("click", markMoment);
     el("pauseButton").addEventListener("click", togglePause);
     el("importButton").addEventListener("click", () => el("fileInput").click());
     el("fileInput").addEventListener("change", async event => {
@@ -1080,6 +1501,8 @@
     el("transcriptRemove").addEventListener("click", removeTranscript);
     el("transcriptDialog").addEventListener("close", () => { state.transcriptOpen = null; });
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", () => { if (state.auto) setTimeout(tryAutoResume, 800); });
+    window.addEventListener("focus", () => { if (state.auto) setTimeout(tryAutoResume, 800); });
     window.addEventListener("pagehide", () => {
       if (state.recorder && state.recorder.state === "recording") {
         showWarning(t("interruption"));
