@@ -1124,35 +1124,54 @@
     const P = pre[rid];
     return P ? P.segs.filter(x => x && x.text).map(x => x.text).join("\n") : "";
   }
-  function preSegment(rid, idx, blob, offset) {
-    if (!getKey() || !rid) return;
-    const P = pre[rid] = pre[rid] || { segs: [], chain: Promise.resolve(), ctx: { id: "pre-" + rid, background: true, warnings: [], lang: state.lang } };
-    P.segs[idx] = { offset, text: null };
-    P.chain = P.chain.then(async () => {
+  // One background piece. A network drop doesn't lose it: it is tried again
+  // (after the connection is back), and once more at Stop if still missing.
+  const waitOnline = ms => navigator.onLine === false ? new Promise(ok => { const t = setTimeout(ok, ms); window.addEventListener("online", () => { clearTimeout(t); ok(); }, { once: true }); }) : Promise.resolve();
+  async function runSeg(P, idx, tries) {
+    const S = P.segs[idx];
+    if (!S || !S.blob) return;
+    for (let attempt = 0; attempt < tries; attempt++) {
       try {
-        const split = await splitAudio(blob);
+        await waitOnline(60000);
+        const split = await splitAudio(S.blob);
         const texts = [];
         for (let k = 0; k < split.count; k++) {
           const p = split.part(k);
-          p.offset = offset + (p.offset || 0);
+          p.offset = S.offset + (p.offset || 0);
           const out = {};
           await listenPart(P.ctx, p, out, "", null, null);
           if (out.text) texts.push(out.text);
         }
-        P.segs[idx].text = texts.join("\n");
+        S.text = texts.join("\n"); S.failed = false; S.blob = null;
+        return;
       } catch (e) {
-        P.segs[idx].failed = true;
-        diag(why(e, "Background transcription of minute " + Math.round(offset / 60)));
+        S.failed = true;
+        diag(why(e, "Background transcription of minute " + Math.round(S.offset / 60) + " (try " + (attempt + 1) + ")"));
+        if (e instanceof KeyError) return;
+        if (attempt + 1 < tries) await sleep(4000 * (attempt + 1));
       }
+    }
+  }
+  function preSegment(rid, idx, blob, offset) {
+    if (!getKey() || !rid) return;
+    const P = pre[rid] = pre[rid] || { segs: [], chain: Promise.resolve(), ctx: { id: "pre-" + rid, background: true, warnings: [], lang: state.lang } };
+    P.segs[idx] = { offset, text: null, blob };
+    P.chain = P.chain.then(async () => {
+      await runSeg(P, idx, 3);
       if (window.MIAPreview) window.MIAPreview(rid, preText(rid));
     });
   }
-  // Used by processJob: the transcript from the background pieces, or null if
-  // any piece is missing (then the whole recording is transcribed as before).
+  // Used by processJob: the transcript from the background pieces. Pieces that
+  // failed are tried again here, one by one; only if a piece is truly missing
+  // is the whole recording transcribed again.
   async function takePre(job) {
     const P = pre[job.preId];
     if (!P) return null;
     await P.chain;
+    for (let i = 0; i < P.segs.length; i++) {
+      const S = P.segs[i];
+      if (S && S.failed && S.blob) { setStep(job, "Catching up on minute " + Math.round(S.offset / 60), job.progress || 3, 80, 25); await runSeg(P, i, 3); }
+    }
     const ok = job.preCount > 0 && P.segs.length === job.preCount && P.segs.every(x => x && x.text != null && !x.failed);
     if (!ok) { diag("Background transcript incomplete (" + P.segs.filter(x => x && x.text != null).length + "/" + job.preCount + "), re-listening to the whole recording"); return null; }
     (P.ctx.warnings || []).forEach(w => warnJob(job, w));
@@ -1247,7 +1266,7 @@
     let stepsDone = 0;
     try {
       if (job.preId && !job.transcriptComplete && pre[job.preId]) {
-        setStep(job, "Finishing the last 2 minutes", 3, 80, 25);
+        setStep(job, "Finishing the last minute", 3, 80, 25);
         const text = await takePre(job);
         if (text && text.trim()) {
           job.transcript = text; job.transcriptComplete = true; job.source = "pre"; job.reportFrom = 80;

@@ -745,10 +745,10 @@
   }
   // ---------- Segments: transcribe while recording ----------
   // A second recorder on the same microphone closes a small file every
-  // 2 minutes and hands it to the Agent, which transcribes it right away with
+  // minute and hands it to the Agent, which transcribes it right away with
   // Whisper + Typhoon. At Stop only the last piece is left, so the report comes
   // quickly and from the accurate engines. The main recording is untouched.
-  const SEG_SECONDS = (() => { try { return Number(localStorage.getItem("mia-seg-seconds")) || 120; } catch { return 120; } })();
+  const SEG_SECONDS = (() => { try { return Number(localStorage.getItem("mia-seg-seconds")) || 60; } catch { return 60; } })();
   const seg = { rec: null, idx: 0, delivered: 0, startAt: 0, timer: null, rid: null, mime: "", off: false, done: null, text: "" };
   function segOne() {
     const r = new MediaRecorder(state.stream, { mimeType: seg.mime, audioBitsPerSecond: 64000 });
@@ -772,7 +772,7 @@
     seg.timer = setInterval(() => {
       if (!state.recorder || state.recorder.state !== "recording" || !seg.rec) return;
       const now = elapsedSeconds();
-      // First piece after 45 s so text shows up early; then every 2 minutes.
+      // First piece after 45 s so text shows up early; then every minute.
       if (now - seg.startAt < (seg.idx === 1 ? Math.min(45, SEG_SECONDS) : SEG_SECONDS)) return;
       const old = seg.rec;
       seg.startAt = now;
